@@ -41,6 +41,11 @@ public class TempoCore : ModuleRules
 				"UMG",
 				// Tempo
 				"TempoCoreShared",
+				"TempoScripting",
+				"Abseil",
+				"gRPC",
+				"Protobuf",
+				"RE2",
 			}
 			);
 		
