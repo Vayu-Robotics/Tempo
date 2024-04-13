@@ -42,6 +42,7 @@ public class TempoCore : ModuleRules
 				// Tempo
 				"TempoCoreShared",
 				"TempoTime",
+				"TempoScripting",
 			}
 			);
 		

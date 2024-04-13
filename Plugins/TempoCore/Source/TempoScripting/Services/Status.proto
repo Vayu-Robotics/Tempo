@@ -1,0 +1,13 @@
+// Copyright Tempo Simulation, LLC. All Rights Reserved
+
+syntax = "proto3";
+
+package Tempo;
+
+service Status {
+  rpc Ping (EmptyStatus) returns (EmptyStatus) {}
+}
+
+message EmptyStatus {
+  
+}
