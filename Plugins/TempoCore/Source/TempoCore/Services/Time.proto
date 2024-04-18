@@ -1,0 +1,15 @@
+// Copyright Tempo Simulation, LLC. All Rights Reserved
+
+syntax = "proto3";
+
+package Tempo;
+
+service Time {
+  rpc Play (Empty) returns (Empty) {}
+
+  rpc Pause (Empty) returns (Empty) {}
+}
+
+message Empty {
+  
+}

@@ -8,6 +8,8 @@
 
 #include "TempoScriptingServer.generated.h"
 
+#pragma comment(linker, "/export:google::protobuf::MessageLite::ParseFromZeroCopyStream(google::protobuf::io::ZeroCopyInputStream*)")
+
 /**
  * A request handler connects the gRPC pipes to accept, handle, and respond to requests to user callbacks.
  */
@@ -21,7 +23,10 @@ struct TRequestHandler
 	typedef typename TMemFunPtrType<false, ServiceType, void(grpc::ServerContext*, RequestType*, grpc::ServerAsyncResponseWriter<ResponseType>*, grpc::CompletionQueue*, grpc::ServerCompletionQueue*, void*)>::Type AcceptFuncType;
 	
 	TRequestHandler(AcceptFuncType AcceptFuncIn)
-		: AcceptFunc(AcceptFuncIn) {}
+		: AcceptFunc(AcceptFuncIn)
+	{
+		static_assert(std::is_base_of_v<grpc::Service, ServiceType>);
+	}
 	
 	void Init(ServiceType* Service)
 	{
@@ -198,6 +203,7 @@ private:
 	int32 TagAllocator = 0;
 	TMap<int32, TUniquePtr<FRequestManager>> RequestManagers;
 	TArray<TUniquePtr<grpc::Service>> Services;
+	
 	TUniquePtr<grpc::Server> Server;
 	TUniquePtr<grpc::ServerCompletionQueue> CompletionQueue;
 };

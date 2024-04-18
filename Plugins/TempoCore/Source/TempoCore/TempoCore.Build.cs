@@ -42,10 +42,6 @@ public class TempoCore : ModuleRules
 				// Tempo
 				"TempoCoreShared",
 				"TempoScripting",
-				"Abseil",
-				"gRPC",
-				"Protobuf",
-				"RE2",
 			}
 			);
 		

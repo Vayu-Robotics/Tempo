@@ -11,18 +11,17 @@
 #include "google/protobuf/generated_message_reflection.h"
 #include "google/protobuf/reflection_ops.h"
 #include "google/protobuf/wire_format.h"
-#include "google/protobuf/generated_message_tctable_impl.h"
 // @@protoc_insertion_point(includes)
 
 // Must be included last.
 #include "google/protobuf/port_def.inc"
 PROTOBUF_PRAGMA_INIT_SEG
-namespace _pb = ::google::protobuf;
-namespace _pbi = ::google::protobuf::internal;
-namespace _fl = ::google::protobuf::internal::field_layout;
+namespace _pb = ::PROTOBUF_NAMESPACE_ID;
+namespace _pbi = ::PROTOBUF_NAMESPACE_ID::internal;
 namespace Tempo {
-      template <typename>
-PROTOBUF_CONSTEXPR Empty::Empty(::_pbi::ConstantInitialized) {}
+template <typename>
+PROTOBUF_CONSTEXPR Empty::Empty(
+    ::_pbi::ConstantInitialized) {}
 struct EmptyDefaultTypeInternal {
   PROTOBUF_CONSTEXPR EmptyDefaultTypeInternal() : _instance(::_pbi::ConstantInitialized{}) {}
   ~EmptyDefaultTypeInternal() {}
@@ -53,7 +52,7 @@ const ::uint32_t TableStruct_Time_2eproto::offsets[] PROTOBUF_SECTION_VARIABLE(
 
 static const ::_pbi::MigrationSchema
     schemas[] PROTOBUF_SECTION_VARIABLE(protodesc_cold) = {
-        {0, -1, -1, sizeof(::Tempo::Empty)},
+        { 0, -1, -1, sizeof(::Tempo::Empty)},
 };
 
 static const ::_pb::Message* const file_default_instances[] = {
@@ -108,19 +107,14 @@ class Empty::_Internal {
  public:
 };
 
-Empty::Empty(::google::protobuf::Arena* arena)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
+Empty::Empty(::PROTOBUF_NAMESPACE_ID::Arena* arena)
+  : ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase(arena) {
   // @@protoc_insertion_point(arena_constructor:Tempo.Empty)
 }
-Empty::Empty(
-    ::google::protobuf::Arena* arena,
-    const Empty& from)
-    : ::google::protobuf::internal::ZeroFieldsBase(arena) {
-  Empty* const _this = this;
-  (void)_this;
-  _internal_metadata_.MergeFrom<::google::protobuf::UnknownFieldSet>(
-      from._internal_metadata_);
-
+Empty::Empty(const Empty& from)
+  : ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase() {
+  Empty* const _this = this; (void)_this;
+  _internal_metadata_.MergeFrom<::PROTOBUF_NAMESPACE_ID::UnknownFieldSet>(from._internal_metadata_);
   // @@protoc_insertion_point(copy_constructor:Tempo.Empty)
 }
 
@@ -128,20 +122,30 @@ Empty::Empty(
 
 
 
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData Empty::_class_data_ = {
+    ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::CopyImpl,
+    ::PROTOBUF_NAMESPACE_ID::internal::ZeroFieldsBase::MergeImpl,
+};
+const ::PROTOBUF_NAMESPACE_ID::Message::ClassData*Empty::GetClassData() const { return &_class_data_; }
 
 
 
 
-::google::protobuf::Metadata Empty::GetMetadata() const {
+
+
+
+::PROTOBUF_NAMESPACE_ID::Metadata Empty::GetMetadata() const {
   return ::_pbi::AssignDescriptors(
       &descriptor_table_Time_2eproto_getter, &descriptor_table_Time_2eproto_once,
       file_level_metadata_Time_2eproto[0]);
 }
 // @@protoc_insertion_point(namespace_scope)
 }  // namespace Tempo
-namespace google {
-namespace protobuf {
-}  // namespace protobuf
-}  // namespace google
+PROTOBUF_NAMESPACE_OPEN
+template<> PROTOBUF_NOINLINE ::Tempo::Empty*
+Arena::CreateMaybeMessage< ::Tempo::Empty >(Arena* arena) {
+  return Arena::CreateMessageInternal< ::Tempo::Empty >(arena);
+}
+PROTOBUF_NAMESPACE_CLOSE
 // @@protoc_insertion_point(global_scope)
 #include "google/protobuf/port_undef.inc"
