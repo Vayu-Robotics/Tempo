@@ -48,5 +48,12 @@ public class TempoScripting : ModuleRules
 			{
 			}
 			);
+		
+		PrivateDefinitions.Add("GRPC_DLL_EXPORTS=1");
+		PrivateDefinitions.Add("GRPCXX_DLL_EXPORTS=1");
+		PrivateDefinitions.Add("GPR_DLL_EXPORTS=1");
+		PrivateDefinitions.Add("PROTOBUF_USE_DLLS=1");
+		PrivateDefinitions.Add("LIBPROTOBUF_EXPORTS=1");
+		PrivateDefinitions.Add("ABSL_BUILD_DLL=1");
 	}
 }

@@ -11,5 +11,9 @@ public class TempoEditorTarget : TargetRules
 		DefaultBuildSettings = BuildSettingsVersion.V4;
 		IncludeOrderVersion = EngineIncludeOrderVersion.Unreal5_3;
 		ExtraModuleNames.Add("Tempo");
+
+		// bOverrideBuildEnvironment = true;
+		// AdditionalLinkerArguments += " /VERBOSE ";
+		// AdditionalLinkerArguments += " /OPT:NOREF ";
 	}
 }

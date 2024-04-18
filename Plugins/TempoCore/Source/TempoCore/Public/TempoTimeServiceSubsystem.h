@@ -18,7 +18,7 @@ namespace Tempo
  * Registers Tempo Time Service.
  */
 UCLASS()
-class TEMPOSCRIPTING_API UTempoTimeServiceSubsystem : public UTempoScriptingWorldSubsystem
+class TEMPOCORE_API UTempoTimeServiceSubsystem : public UTempoScriptingWorldSubsystem
 {
 	GENERATED_BODY()
 	

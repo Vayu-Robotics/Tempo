@@ -8,8 +8,6 @@
 
 #include "TempoScriptingServer.generated.h"
 
-#pragma comment(linker, "/export:google::protobuf::MessageLite::ParseFromZeroCopyStream(google::protobuf::io::ZeroCopyInputStream*)")
-
 /**
  * A request handler connects the gRPC pipes to accept, handle, and respond to requests to user callbacks.
  */
