@@ -6,3 +6,4 @@
 !.gitignore
 # And the manifest file
 !manifest.json
+!gRPC

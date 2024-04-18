@@ -2,9 +2,9 @@
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 TEMPO_ROOT=$(realpath "$SCRIPT_DIR/..")
-PROTOC="$TEMPO_ROOT/Plugins/TempoCore/Source/ThirdParty/Protobuf/Binaries/protoc.app/Contents/MacOS/protoc"
-GRPC_CPP_PLUGIN="$TEMPO_ROOT/Plugins/TempoCore/Source/ThirdParty/gRPC/Binaries/grpc_cpp_plugin.app/Contents/MacOS/grpc_cpp_plugin"
-GRPC_PYTHON_PLUGIN="$TEMPO_ROOT/Plugins/TempoCore/Source/ThirdParty/gRPC/Binaries/grpc_python_plugin.app/Contents/MacOS/grpc_python_plugin"
+PROTOC="$TEMPO_ROOT/Plugins/TempoCore/Source/ThirdParty/gRPC/Mac/bin/protoc"
+GRPC_CPP_PLUGIN="$TEMPO_ROOT/Plugins/TempoCore/Source/ThirdParty/gRPC/Mac/bin/grpc_cpp_plugin"
+GRPC_PYTHON_PLUGIN="$TEMPO_ROOT/Plugins/TempoCore/Source/ThirdParty/gRPC/Mac/bin/grpc_python_plugin"
 SOURCE_DIR="$TEMPO_ROOT/Plugins/TempoCore/Source/TempoCore/Services"
 CPP_DEST_DIR="$TEMPO_ROOT/Plugins/TempoCore/Source/TempoCore/Private"
 PYTHON_DEST_DIR="$TEMPO_ROOT/Content/Python"
