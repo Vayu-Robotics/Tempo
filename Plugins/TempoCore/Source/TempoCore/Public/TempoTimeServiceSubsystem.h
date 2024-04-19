@@ -2,10 +2,10 @@
 
 #pragma once
 
+#include <grpcpp/grpcpp.h>
+
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
-
-#include "TempoScriptingWorldSubsystem.h"
 
 #include "TempoTimeServiceSubsystem.generated.h"
 
@@ -18,7 +18,7 @@ namespace Tempo
  * Registers Tempo Time Service.
  */
 UCLASS()
-class TEMPOCORE_API UTempoTimeServiceSubsystem : public UTempoScriptingWorldSubsystem
+class TEMPOCORE_API UTempoTimeServiceSubsystem : public UWorldSubsystem
 {
 	GENERATED_BODY()
 	

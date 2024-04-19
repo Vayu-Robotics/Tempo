@@ -23,6 +23,9 @@ void UTempoScriptingServer::Initialize(int32 Port)
 
 	CompletionQueue.Reset(Builder.AddCompletionQueue().release());
 	Server.Reset(Builder.BuildAndStart().release());
+
+	checkf(Server.Get(), TEXT("Error while building server"));
+	
 	UE_LOG(LogTempoScripting, Display, TEXT("Tempo gRPC server listening on %s"), *ServerAddress);
 
 	// Now that the server has started we can initialize the request managers.
@@ -42,7 +45,10 @@ void UTempoScriptingServer::Deinitialize()
 	}
 	
 	bIsInitialized = false;
-	
+
+	checkf(Server.Get(), TEXT("Server was unexpectedly null"));
+	checkf(CompletionQueue.Get(), TEXT("CompletionQueue was unexpectedly null"));
+
 	Server->Shutdown();
 	CompletionQueue->Shutdown();
 

@@ -2,6 +2,8 @@
 
 #include "TempoTimeServiceSubsystem.h"
 
+#include "TempoScriptingWorldSubsystem.h"
+
 #include "time.grpc.pb.h"
 
 #include "CoreMinimal.h"
@@ -13,7 +15,7 @@ void UTempoTimeServiceSubsystem::Initialize(FSubsystemCollectionBase& Collection
 {
 	Super::Initialize(Collection);
 	
-	if (!GetWorld()->IsGameWorld())
+	if (!(GetWorld()->WorldType == EWorldType::Game || GetWorld()->WorldType == EWorldType::PIE))
 	{
 		return;
 	}
@@ -28,12 +30,12 @@ grpc::Status UTempoTimeServiceSubsystem::Play(const Tempo::Empty& Request, Tempo
 {
 	UGameplayStatics::GetPlayerController(GetWorld(), 0)->SetPause(false);
 	
-	return grpc::Status::OK;
+	return grpc::Status();
 }
 
 grpc::Status UTempoTimeServiceSubsystem::Pause(const Tempo::Empty& Request, Tempo::Empty& Response) const
 {
 	UGameplayStatics::GetPlayerController(GetWorld(), 0)->SetPause(true);
 	
-	return grpc::Status::OK;
+	return grpc::Status();
 }

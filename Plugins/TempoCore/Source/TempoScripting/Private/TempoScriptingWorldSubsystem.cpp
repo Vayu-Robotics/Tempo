@@ -15,7 +15,7 @@ void UTempoScriptingWorldSubsystem::PostInitialize()
 {
 	Super::PostInitialize();
 
-	if (!GetWorld()->IsGameWorld())
+	if (!(GetWorld()->WorldType == EWorldType::Game || GetWorld()->WorldType == EWorldType::PIE))
 	{
 		return;
 	}

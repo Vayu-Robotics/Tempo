@@ -42,7 +42,6 @@ public class TempoCore : ModuleRules
 				// Tempo
 				"TempoCoreShared",
 				"TempoScripting",
-				// "gRPC",
 			}
 			);
 		
