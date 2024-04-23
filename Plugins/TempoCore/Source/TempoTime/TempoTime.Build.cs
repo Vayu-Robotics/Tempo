@@ -41,6 +41,7 @@ public class TempoTime : ModuleRules
 				"UMG",
 				// Tempo
 				"TempoCoreShared",
+				"TempoScripting",
 			}
 			);
 		
