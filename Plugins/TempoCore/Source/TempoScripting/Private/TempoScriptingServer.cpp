@@ -8,7 +8,8 @@
 #include "grpcpp/impl/service_type.h"
 
 UTempoScriptingServer::UTempoScriptingServer() = default;
-UTempoScriptingServer::UTempoScriptingServer(FVTableHelper& Helper) {}
+UTempoScriptingServer::UTempoScriptingServer(FVTableHelper& Helper)
+	: Super(Helper) {}
 UTempoScriptingServer::~UTempoScriptingServer() = default;
 
 void UTempoScriptingServer::Initialize(int32 Port)
@@ -53,7 +54,9 @@ void UTempoScriptingServer::Deinitialize()
 	checkf(Server.Get(), TEXT("Server was unexpectedly null"));
 	checkf(CompletionQueue.Get(), TEXT("CompletionQueue was unexpectedly null"));
 
-	Server->Shutdown();
+	static constexpr int32 MaxShutdownTimeNanoSeconds = 6e7; // 0.05s
+	static constexpr gpr_timespec MaxShutdownWaitTime {0, MaxShutdownTimeNanoSeconds, GPR_TIMESPAN};
+	Server->Shutdown(MaxShutdownWaitTime);
 	CompletionQueue->Shutdown();
 
 	// Flush (and discard) all pending events (until we get the shutdown event).
@@ -139,7 +142,12 @@ void UTempoScriptingServer::HandleEventForTag(int32 Tag)
 				(*RequestManager)->HandleAndRespond();
 				break;
 			}
-		case FRequestManager::RESPONDED: // The response has been sent.
+		case FRequestManager::RESPONDING: // A response has been sent, and there are more to come.
+			{
+				(*RequestManager)->HandleAndRespond();
+				break;
+			}
+		case FRequestManager::FINISHING: // The rpc has finished.
 			{
 				RequestManagers.Remove(Tag);
 				break;
