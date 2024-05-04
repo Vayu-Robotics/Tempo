@@ -1,0 +1,9 @@
+// Copyright Tempo Simulation, LLC. All Rights Reserved
+
+syntax = "proto3";
+
+import "TempoScripting/Empty.proto";
+
+service CameraService {
+  rpc StreamImages(TempoScripting.Empty) returns (stream TempoScripting.Empty) {}
+}

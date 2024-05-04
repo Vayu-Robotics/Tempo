@@ -2,7 +2,7 @@
 
 using UnrealBuildTool;
 
-public class Tempo : ModuleRules
+public class Tempo : TempoModuleRules
 {
 	public Tempo(ReadOnlyTargetRules Target) : base(Target)
 	{
@@ -22,6 +22,7 @@ public class Tempo : ModuleRules
 			new string[]
 			{
 				"TempoCore",
+				"TempoScripting",
 			}
 			);
 	}

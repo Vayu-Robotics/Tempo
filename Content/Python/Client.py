@@ -2,16 +2,15 @@
 
 import asyncio
 import grpc
-import Time_pb2
-import Time_pb2_grpc
+from TempoTime import Time_pb2
+from TempoTime import Time_pb2_grpc
+from TempoScripting import Empty_pb2
 
 async def main():
     import grpc
-    import Time_pb2
-    import Time_pb2_grpc
     async with grpc.aio.insecure_channel("localhost:10002") as channel:
-        stub = Time_pb2_grpc.TimeStub(channel)
-        message = Time_pb2.Empty()
+        stub = Time_pb2_grpc.TimeServiceStub(channel)
+        message = Empty_pb2.Empty()
         while True:
             command = input("Command: ")
             if command in {"Pause", "pause"}:
