@@ -3,8 +3,8 @@
 set -e
 
 ENGINE_DIR="${1//\\//}"
-PROJECT_FILE="$2"
-PROJECT_ROOT="$3"
+PROJECT_FILE="${2//\\//}"
+PROJECT_ROOT="${3//\\//}"
 TARGET_NAME="$4"
 TARGET_CONFIG="$5"
 TARGET_PLATFORM="$6"
@@ -219,6 +219,16 @@ done
 # Then dump a json describing all module dependencies.
 eval "$DOTNET" "./Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.dll" -Mode=JsonExport "$TARGET_NAME" "$TARGET_PLATFORM" "$TARGET_CONFIG" -Project="$PROJECT_FILE" -OutputFile="$TEMP/TempoModules.json" -NoMutex > /dev/null 2>&1
 
+SYNCPROTOS() {
+  SRC="$1"
+  DEST="$2"
+  if [[ "$OSTYPE" = "msys" ]]; then
+    xcopy -E -I -Y -S -EXCLUDE:"*.*" "*.proto" "$SRC" "$DEST" > /dev/null 2>&1
+  else
+    rsync -av --include="*.proto" --exclude="*" "$SRC" "$DEST" > /dev/null 2>&1
+  fi
+}
+
 GET_MODULE_INCLUDES_PUBLIC_ONLY() {
   local MODULE_NAME="$1"
   local INCLUDES_DIR="$2"
@@ -232,7 +242,7 @@ GET_MODULE_INCLUDES_PUBLIC_ONLY() {
       else
         # This is a new dependency - add its public protos and those of its public dependencies.
         mkdir -p "$INCLUDES_DIR/$PUBLIC_DEPENDENCY"
-        rsync -av --include="*.proto" --exclude="*" "$SRC_TEMP_DIR/$PUBLIC_DEPENDENCY/Public/" "$INCLUDES_DIR/$PUBLIC_DEPENDENCY" > /dev/null 2>&1
+        SYNCPROTOS "$SRC_TEMP_DIR/$PUBLIC_DEPENDENCY/Public/" "$INCLUDES_DIR/$PUBLIC_DEPENDENCY"
         GET_MODULE_INCLUDES_PUBLIC_ONLY "$PUBLIC_DEPENDENCY" "$INCLUDES_DIR"
       fi
     fi
@@ -244,8 +254,8 @@ GET_MODULE_INCLUDES() {
   local INCLUDES_DIR="$2"
 #  # First copy everything from this modules public and private folders.
   mkdir -p "$INCLUDES_DIR/$MODULE_NAME"
-  rsync -av --include="*.proto" --exclude="*" "$SRC_TEMP_DIR/$MODULE_NAME/Public/" "$INCLUDES_DIR/$MODULE_NAME" > /dev/null 2>&1
-  rsync -av --include="*.proto" --exclude="*" "$SRC_TEMP_DIR/$MODULE_NAME/Private/" "$INCLUDES_DIR/$MODULE_NAME" > /dev/null 2>&1
+  SYNCPROTOS "$SRC_TEMP_DIR/$MODULE_NAME/Public/" "$INCLUDES_DIR/$MODULE_NAME"
+  SYNCPROTOS "$SRC_TEMP_DIR/$MODULE_NAME/Private/" "$INCLUDES_DIR/$MODULE_NAME"
   PUBLIC_DEPENDENCIES=$(jq -r --arg TargetName "$TARGET_NAME" --arg ModuleName "$MODULE_NAME" \
     'select(.Name == $TargetName)["Modules"][$ModuleName]["PublicDependencyModules"][]' < "$TEMP/TempoModules.json")
   PRIVATE_DEPENDENCIES=$(jq -r --arg TargetName "$TARGET_NAME" --arg ModuleName "$MODULE_NAME" \
@@ -258,7 +268,7 @@ GET_MODULE_INCLUDES() {
       else
         # This is a new dependency - add its public protos and those of its public dependencies.
         mkdir -p "$INCLUDES_DIR/$PUBLIC_DEPENDENCY"
-        rsync -av --include="*.proto" --exclude="*" "$SRC_TEMP_DIR/$PUBLIC_DEPENDENCY/Public/" "$INCLUDES_DIR/$PUBLIC_DEPENDENCY" > /dev/null 2>&1
+        SYNCPROTOS "$SRC_TEMP_DIR/$PUBLIC_DEPENDENCY/Public/" "$INCLUDES_DIR/$PUBLIC_DEPENDENCY"
         GET_MODULE_INCLUDES_PUBLIC_ONLY "$PUBLIC_DEPENDENCY" "$INCLUDES_DIR"
       fi
     fi
@@ -272,7 +282,7 @@ GET_MODULE_INCLUDES() {
       else
         # This is a new dependency - add its public protos and those of its public dependencies.
         mkdir -p "$INCLUDES_DIR/$PRIVATE_DEPENDENCY"
-        rsync -av --include="*.proto" --exclude="*" "$SRC_TEMP_DIR/$PRIVATE_DEPENDENCY/Public/" "$INCLUDES_DIR/$PRIVATE_DEPENDENCY" > /dev/null 2>&1
+        SYNCPROTOS "$SRC_TEMP_DIR/$PRIVATE_DEPENDENCY/Public/" "$INCLUDES_DIR/$PRIVATE_DEPENDENCY" > /dev/null 2>&1
         GET_MODULE_INCLUDES_PUBLIC_ONLY "$PRIVATE_DEPENDENCY" "$INCLUDES_DIR"
       fi
     fi
