@@ -25,18 +25,26 @@ namespace TempoSensors
 }
 
 UCLASS()
-class TEMPOSENSORS_API UTempoCameraServiceSubsystem : public UWorldSubsystem, public ITempoWorldScriptable
+class TEMPOSENSORS_API UTempoCameraServiceSubsystem : public UTickableWorldSubsystem, public ITempoWorldScriptable
 {
 	GENERATED_BODY()
 	
 public:
 	virtual void RegisterWorldServices(UTempoScriptingServer* ScriptingServer) override;
 
+	virtual void Tick(float DeltaTime) override;
+	virtual TStatId GetStatId() const override;
+
+	void AddCameraFrame(int32 CameraId, FTextureRenderTargetResource* TextureResource);
+
 private:
 	void GetAvailableCameras(const TempoSensors::AvailableCamerasRequest& Request, const TResponseDelegate<TempoSensors::AvailableCamerasResponse>& ResponseContinuation) const;
 
 	void StreamImages(const TempoSensors::StreamImagesRequest& Request, const TResponseDelegate<TempoSensors::Image>& ResponseContinuation);
 
-	TMap<int32, TResponseDelegate<TempoSensors::Image>> PendingImageResponseContinuations;
-};
+	static void EnqueueTextureRead(FTextureRenderTargetResource* TextureResource, TArray<FColor>& OutImageData);
 
+	TMap<int32, TResponseDelegate<TempoSensors::Image>> PendingImageResponseContinuations;
+
+	TMap<int32, FTextureRenderTargetResource*> PendingImages;
+};
