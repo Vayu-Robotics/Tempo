@@ -16,6 +16,9 @@ void UTempoScriptingServer::Initialize(int32 Port)
 {
 	const FString ServerAddress = FString::Printf(TEXT("0.0.0.0:%d"), Port);
 	grpc::ServerBuilder Builder;
+	grpc::ResourceQuota ResourceQuota;
+	ResourceQuota.SetMaxThreads(8);
+	Builder.SetResourceQuota(ResourceQuota);
 	Builder.AddListeningPort(TCHAR_TO_UTF8(*ServerAddress), grpc::InsecureServerCredentials());
 	for (const TUniquePtr<grpc::Service>& Service : Services)
 	{

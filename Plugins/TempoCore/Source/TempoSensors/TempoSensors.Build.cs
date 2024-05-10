@@ -36,6 +36,8 @@ public class TempoSensors : TempoModuleRules
 			{
 				// Unreal
 				"CoreUObject",
+				"RenderCore",
+				"RHI",
 				// Tempo
 				"TempoCoreShared",
 				"TempoScripting",

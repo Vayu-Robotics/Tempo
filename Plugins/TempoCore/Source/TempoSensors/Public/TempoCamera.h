@@ -2,8 +2,6 @@
 
 #pragma once
 
-#include "TempoScriptingServer.h"
-
 #include "CoreMinimal.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "TempoCamera.generated.h"
@@ -23,8 +21,6 @@ public:
 
 	int32 GetId() const { return CameraId; }
 
-	void EnqueueImageStreamContinuation(const TResponseDelegate<TempoSensors::Image>& ResponseContinuation) { PendingImageStreamContinuations.Enqueue(ResponseContinuation); }
-
 protected:
 	virtual void BeginPlay() override;
 
@@ -39,6 +35,4 @@ private:
 	float RateHz = 1.0;
 
 	FTimerHandle TimerHandle;
-
-	TQueue<TResponseDelegate<TempoSensors::Image>> PendingImageStreamContinuations;
 };
