@@ -39,6 +39,11 @@
 			"Name": "TempoSensors",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "TempoVehicles",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	],
 	"PreBuildSteps": {

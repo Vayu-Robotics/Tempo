@@ -1,0 +1,27 @@
+// Copyright Tempo Simulation, LLC. All Rights Reserved
+
+syntax = "proto3";
+
+import "TempoScripting/Empty.proto";
+
+enum VehicleModel {
+  UNICYCLE = 0;
+  KINEMATIC_BICYCLE = 1;
+  DYNAMIC_BICYCLE = 2;
+}
+
+message CommandableVehiclesResponse{
+  repeated int32 vehicle_id = 1;
+}
+
+message DrivingCommandRequest {
+  int32 vehicle_id = 1;
+  float acceleration = 2;
+  float steering = 3;
+}
+
+service DrivingService {
+  rpc GetCommandableVehicles(TempoScripting.Empty) returns (CommandableVehiclesResponse);
+  
+  rpc CommandVehicle(DrivingCommandRequest) returns (TempoScripting.Empty);
+}
