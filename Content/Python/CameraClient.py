@@ -5,11 +5,11 @@ import asyncio
 import time
 
 
-def show_image(image):
+def show_image(image, name):
     width, height = (image.width, image.height)
     packed_data = np.array(image.pixels, dtype=np.uint32)
     image_data = packed_data.view(dtype=np.uint8).reshape((height, width, 4))  # Assuming ARGB
-    cv2.imshow("Image", image_data)
+    cv2.imshow(f"Camera {name}", image_data)
     cv2.waitKey(1)
 
 
@@ -21,7 +21,7 @@ def stream_images_sync():
 async def stream_images_async(camera_id):
     overall_count = 0
     count = 0
-    async for image in ts.stream_images(0):
+    async for image in ts.stream_images(camera_id):
         overall_count += 1
         if overall_count == 20:
             start = time.time()
@@ -30,11 +30,11 @@ async def stream_images_async(camera_id):
             end = time.time()
             diff = end - start
             print("Got {} images in {} seconds from camera {} ({} per second)".format(count, diff, camera_id, count / diff))
-        # show_image(image)
+        # show_image(image, camera_id)
 
 
 async def main():
-    await asyncio.gather(stream_images_async(0), stream_images_async(1), stream_images_async(2))
+    await asyncio.gather(stream_images_async(0), stream_images_async(1), stream_images_async(2), stream_images_async(3))
 
 
 if __name__ == "__main__":
