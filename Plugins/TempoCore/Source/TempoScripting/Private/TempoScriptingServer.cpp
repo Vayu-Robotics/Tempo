@@ -8,8 +8,7 @@
 #include "grpcpp/impl/service_type.h"
 
 UTempoScriptingServer::UTempoScriptingServer() = default;
-UTempoScriptingServer::UTempoScriptingServer(FVTableHelper& Helper)
-	: Super(Helper) {}
+UTempoScriptingServer::UTempoScriptingServer(FVTableHelper& Helper) {}
 UTempoScriptingServer::~UTempoScriptingServer() = default;
 
 void UTempoScriptingServer::Initialize(int32 Port)
@@ -54,9 +53,7 @@ void UTempoScriptingServer::Deinitialize()
 	checkf(Server.Get(), TEXT("Server was unexpectedly null"));
 	checkf(CompletionQueue.Get(), TEXT("CompletionQueue was unexpectedly null"));
 
-	static constexpr int32 MaxShutdownTimeNanoSeconds = 5e7; // 0.05s
-	static constexpr gpr_timespec MaxShutdownWaitTime {0, MaxShutdownTimeNanoSeconds, GPR_TIMESPAN};
-	Server->Shutdown(MaxShutdownWaitTime);
+	Server->Shutdown();
 	CompletionQueue->Shutdown();
 
 	// Flush (and discard) all pending events (until we get the shutdown event).
@@ -103,7 +100,8 @@ void UTempoScriptingServer::Tick(float DeltaTime)
 		case grpc::CompletionQueue::GOT_EVENT:
 			{
 				// Handle the event and then wait for another.
-				HandleEventForTag(*Tag, bOk);
+				GPR_ASSERT(bOk);
+				HandleEventForTag(*Tag);
 				break;
 			}
 		case grpc::CompletionQueue::SHUTDOWN:
@@ -121,16 +119,10 @@ void UTempoScriptingServer::Tick(float DeltaTime)
 	}
 }
 
-void UTempoScriptingServer::HandleEventForTag(int32 Tag, bool bOk)
+void UTempoScriptingServer::HandleEventForTag(int32 Tag)
 {
-	if (TSharedPtr<FRequestManager>* RequestManager = RequestManagers.Find(Tag))
+	if (TUniquePtr<FRequestManager>* RequestManager = RequestManagers.Find(Tag))
 	{
-		if (!bOk)
-		{
-			RequestManagers.Remove(Tag);
-			return;
-		}
-		
 		switch ((*RequestManager)->GetState())
 		{
 		case FRequestManager::UNINITIALIZED: // Shouldn't happen.
@@ -143,16 +135,11 @@ void UTempoScriptingServer::HandleEventForTag(int32 Tag, bool bOk)
 				// Immediately prepare to receive another request.
 				const int32 NewTag = TagAllocator++;
 				RequestManagers.Emplace(NewTag, (*RequestManager)->Duplicate(NewTag))->Init(CompletionQueue.Get());
-
+	
 				(*RequestManager)->HandleAndRespond();
 				break;
 			}
-		case FRequestManager::RESPONDING: // A response has been sent, and there are more to come.
-			{
-				(*RequestManager)->HandleAndRespond();
-				break;
-			}
-		case FRequestManager::FINISHING: // The rpc has finished.
+		case FRequestManager::RESPONDED: // The response has been sent.
 			{
 				RequestManagers.Remove(Tag);
 				break;
