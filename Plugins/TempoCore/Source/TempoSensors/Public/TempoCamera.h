@@ -27,6 +27,9 @@ protected:
 private:
 	UFUNCTION()
 	void SendImage();
+
+	UFUNCTION(CallInEditor)
+	void RunCompressionTest();
 	
 	UPROPERTY(EditAnywhere)
 	int32 CameraId = 0;

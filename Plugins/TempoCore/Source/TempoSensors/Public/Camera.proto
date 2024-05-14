@@ -8,6 +8,16 @@ enum ImageType {
   SEMANTIC_LABELS = 2;
 }
 
+enum CompressionLevel {
+  LOSSLESS = 0; // 100
+  VERY_LOW = 1; // 90
+  LOW = 2; // 80
+  MID = 3; // 70
+  HIGH = 4; // 60
+  VERY_HIGH = 5; // 50
+  MAX = 6; // 40
+}
+
 message CameraDescriptor {
   int32 id = 1;
   string name = 2;
@@ -20,7 +30,7 @@ message CameraDescriptor {
 message Image {
   int32 width = 1;
   int32 height = 2;
-  repeated uint32 pixels = 3;
+  bytes data = 3;
 }
 
 message AvailableCamerasRequest {
@@ -33,6 +43,7 @@ message AvailableCamerasResponse {
 
 message StreamImagesRequest{
   int32 camera_id = 1;
+  CompressionLevel compression_level = 2;
 }
 
 service CameraService {
