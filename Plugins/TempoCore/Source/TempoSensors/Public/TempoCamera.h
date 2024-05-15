@@ -2,14 +2,11 @@
 
 #pragma once
 
+#include "TempoSensorsTypes.h"
+
 #include "CoreMinimal.h"
 #include "Components/SceneCaptureComponent2D.h"
 #include "TempoCamera.generated.h"
-
-namespace TempoSensors
-{
-	class Image;
-}
 
 UCLASS(Blueprintable, BlueprintType)
 class TEMPOSENSORS_API UTempoCamera : public USceneCaptureComponent2D
@@ -21,21 +18,52 @@ public:
 
 	int32 GetId() const { return CameraId; }
 
+	const FIntPoint& GetSizeXY() const { return SizeXY; }
+
+	float GetRate() const { return RateHz; }
+
+	EImageType GetImageType() const { return ImageType; }
+
+	void SetSizeXY(const FIntPoint& SizeXYIn);
+
+	void SetImageType(EImageType ImageTypeIn);
+
+	// void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+
+	virtual void UpdateSceneCaptureContents(FSceneInterface* Scene) override;
+
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+	
 protected:
 	virtual void BeginPlay() override;
-
+	
 private:
 	UFUNCTION()
-	void SendImage();
+	void MaybeCapture();
+	
+	void UpdateRenderTarget();
 
-	UFUNCTION(CallInEditor)
-	void RunCompressionTest();
+	void UpdatePostProcessMaterial();
 	
 	UPROPERTY(EditAnywhere)
 	int32 CameraId = 0;
 
 	UPROPERTY(EditAnywhere)
-	float RateHz = 1.0;
+	int32 FrameCounter = 0;
+	
+	UPROPERTY(EditAnywhere)
+	float RateHz = 10.0;
 
+	UPROPERTY(EditAnywhere)
+	FIntPoint SizeXY = FIntPoint(960, 540);
+
+	UPROPERTY(EditAnywhere)
+	TEnumAsByte<EImageType> ImageType = EImageType::RGB;
+	
 	FTimerHandle TimerHandle;
+	//
+	// UPROPERTY()
+	// bool bCaptureQueued = false;
 };

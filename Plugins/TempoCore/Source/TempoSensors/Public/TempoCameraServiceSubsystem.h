@@ -27,10 +27,11 @@ namespace TempoSensors
 
 struct FRenderRequest
 {
-	FRenderRequest(const FIntPoint& ImageSizeIn)
-		: ImageSize(ImageSizeIn), Image(TArray(&FColor::Green, ImageSize.X * ImageSize.Y)) {}
+	FRenderRequest(const FIntPoint& ImageSizeIn, int32 FrameCounterIn)
+		: ImageSize(ImageSizeIn), FrameCounter(FrameCounterIn), Image(TArray(&FColor::Green, ImageSize.X * ImageSize.Y)) {}
 	
 	FIntPoint ImageSize = FIntPoint::ZeroValue;
+	int32 FrameCounter;
 	TArray<FColor> Image;
 	FRenderCommandFence RenderFence;
 };
@@ -42,7 +43,6 @@ struct FImageRequest
 	
 	int32 Quality = 100;
 	TResponseDelegate<TempoSensors::Image> ResponseContinuation;
-	TUniquePtr<FRenderRequest> RenderRequest;
 };
 
 UCLASS()
@@ -56,7 +56,9 @@ public:
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
 
-	void MaybeSendImage(int32 CameraId, FTextureRenderTargetResource* TextureResource);
+	bool HasPendingRequestForCamera(int32 CameraId) const;
+
+	void SendImage(int32 CameraId, int32 FrameCounter, FTextureRenderTargetResource* TextureResource);
 
 private:
 	void GetAvailableCameras(const TempoSensors::AvailableCamerasRequest& Request, const TResponseDelegate<TempoSensors::AvailableCamerasResponse>& ResponseContinuation) const;
@@ -64,4 +66,6 @@ private:
 	void StreamImages(const TempoSensors::StreamImagesRequest& Request, const TResponseDelegate<TempoSensors::Image>& ResponseContinuation);
 	
 	TMap<int32, FImageRequest> PendingImageRequests;
+	
+	TMap<int32, TArray<TUniquePtr<FRenderRequest>>> PendingRenderRequests;
 };

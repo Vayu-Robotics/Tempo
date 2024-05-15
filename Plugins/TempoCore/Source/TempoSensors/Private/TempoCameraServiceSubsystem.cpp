@@ -2,11 +2,15 @@
 
 #include "TempoCameraServiceSubsystem.h"
 
-#include "ImageUtils.h"
 #include "TempoCamera.h"
 #include "TempoSensors.h"
+#include "TempoSensorsSettings.h"
 
 #include "TempoSensors/Camera.grpc.pb.h"
+
+#include "TempoCoreSettings.h"
+
+#include "ImageUtils.h"
 
 using CameraService = TempoSensors::CameraService::AsyncService;
 using CameraDescriptor = TempoSensors::CameraDescriptor;
@@ -23,13 +27,46 @@ void UTempoCameraServiceSubsystem::RegisterWorldServices(UTempoScriptingServer* 
 		);
 }
 
+TempoSensors::ImageType ToProtoImageType(EImageType ImageType)
+{
+	switch (ImageType)
+	{
+	case EImageType::RGB:
+		{
+			return TempoSensors::RBG;
+		}
+	case EImageType::DEPTH:
+		{
+			return TempoSensors::DEPTH;
+		}
+	case EImageType::SEMANTIC_LABELS:
+		{
+			return TempoSensors::SEMANTIC_LABELS;
+		}
+	default:
+		{
+			checkf(false, TEXT("Unhandled image type"));
+			return TempoSensors::RBG;
+		}
+	}
+}
+
 void UTempoCameraServiceSubsystem::GetAvailableCameras(const TempoSensors::AvailableCamerasRequest& Request, const TResponseDelegate<TempoSensors::AvailableCamerasResponse>& ResponseContinuation) const
 {
 	AvailableCamerasResponse Response;
-	for (TObjectIterator<UTempoCamera> It; It; ++It)
+	for (TObjectIterator<UTempoCamera> CameraIt; CameraIt; ++CameraIt)
 	{
-		const UTempoCamera* Camera = *It;
-		Response.add_available_cameras()->set_id(Camera->GetId());
+		const UTempoCamera* Camera = *CameraIt;
+		if (IsValid(Camera) && Camera->GetWorld() == GetWorld())
+		{
+			auto* AvailableCamera = Response.add_available_cameras();
+			AvailableCamera->set_id(Camera->GetId());
+			AvailableCamera->set_name(TCHAR_TO_UTF8(*Camera->GetName()));
+			AvailableCamera->set_image_type(ToProtoImageType(Camera->GetImageType()));
+			AvailableCamera->set_width(Camera->GetSizeXY().X);
+			AvailableCamera->set_height(Camera->GetSizeXY().Y);
+			AvailableCamera->set_rate(Camera->GetRate());
+		}
 	}
 	ResponseContinuation.ExecuteIfBound(Response, grpc::Status_OK);
 }
@@ -85,40 +122,53 @@ void UTempoCameraServiceSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// If we're waiting on any render requests, flush all rendering commands.
-	for (const auto& PendingImageRequest: PendingImageRequests)
+	// In some cases (always in synchronous mode or when configured to do so in asynchronous mode) we block the
+	// game thread to flush all rendering commands and send the images at the first available opportunity.
+	const UTempoSensorsSettings* TempoSensorsSettings = GetDefault<UTempoSensorsSettings>();
+	const UTempoCoreSettings* TempoCoreSettings = GetDefault<UTempoCoreSettings>();
+	if (TempoSensorsSettings->GetBlockOnCameraRender() || TempoCoreSettings->GetTimeMode() == ETimeMode::FixedStep)
 	{
-		const FImageRequest& ImageRequest = PendingImageRequest.Value;
-		if (ImageRequest.RenderRequest.IsValid())
+		for (const auto& PendingRenderRequest : PendingRenderRequests)
 		{
-			FlushRenderingCommands();
-			break;
+			if (!PendingRenderRequest.Value.IsEmpty() && !PendingRenderRequest.Value[0]->RenderFence.IsFenceComplete())
+			{
+				FlushRenderingCommands();
+				break;
+			}
 		}
 	}
-
+	
 	for (auto PendingImageRequestIt = PendingImageRequests.CreateIterator(); PendingImageRequestIt; ++PendingImageRequestIt)
 	{
 		const int32 CameraId = PendingImageRequestIt->Key;
 		FImageRequest& ImageRequest = PendingImageRequestIt->Value;
-		if (ImageRequest.RenderRequest.IsValid() && ImageRequest.RenderRequest->RenderFence.IsFenceComplete())
+		if (auto* RenderRequestBuffer = PendingRenderRequests.Find(CameraId))
 		{
-			// Compress
-			TArray64<uint8> CompressedData;
-			FImageUtils::CompressImage(CompressedData,
-						TEXT("jpg"),
-						FImageView(ImageRequest.RenderRequest->Image.GetData(), ImageRequest.RenderRequest->ImageSize.X, ImageRequest.RenderRequest->ImageSize.Y),
-						ImageRequest.Quality);
+			while (!RenderRequestBuffer->IsEmpty() && (*RenderRequestBuffer)[0]->RenderFence.IsFenceComplete())
+			{
+				const TUniquePtr<FRenderRequest> RenderRequest((*RenderRequestBuffer)[0].Release());
+				RenderRequestBuffer->RemoveAt(0);
 
-			// Pack into message
-			TempoSensors::Image Image;	
-			Image.set_width(ImageRequest.RenderRequest->ImageSize.X);
-			Image.set_height(ImageRequest.RenderRequest->ImageSize.Y);
-			Image.set_data(CompressedData.GetData(), CompressedData.Num());
+				UE_LOG(LogTemp, Warning, TEXT("Sending frame %d from Camera %d at %f"), RenderRequest->FrameCounter, CameraId, GetWorld()->GetTimeSeconds());
+				
+				// Compress
+				TArray64<uint8> CompressedData;
+				FImageUtils::CompressImage(CompressedData,
+							TEXT("png"),
+							FImageView(RenderRequest->Image.GetData(), RenderRequest->ImageSize.X, RenderRequest->ImageSize.Y),
+							ImageRequest.Quality);
 
-			// Send
-			ImageRequest.ResponseContinuation.ExecuteIfBound(Image, grpc::Status_OK);
+				// Pack into message
+				TempoSensors::Image Image;	
+				Image.set_width(RenderRequest->ImageSize.X);
+				Image.set_height(RenderRequest->ImageSize.Y);
+				Image.set_data(CompressedData.GetData(), CompressedData.Num());
 
-			PendingImageRequests.Remove(CameraId);
+				// Send
+				ImageRequest.ResponseContinuation.ExecuteIfBound(Image, grpc::Status_OK);
+
+				PendingImageRequests.Remove(CameraId);
+			}
 		}
 	}
 }
@@ -128,22 +178,24 @@ TStatId UTempoCameraServiceSubsystem::GetStatId() const
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UTempoCameraServiceSubsystem, STATGROUP_Tickables);
 }
 
-void UTempoCameraServiceSubsystem::MaybeSendImage(int32 CameraId, FTextureRenderTargetResource* TextureResource)
+bool UTempoCameraServiceSubsystem::HasPendingRequestForCamera(int32 CameraId) const
 {
-	FImageRequest* ImageRequest = PendingImageRequests.Find(CameraId);
-	if (!ImageRequest)
-	{
-		// No one's asking for this camera's images - don't bother rendering it.
-		return;
-	}
+	return PendingImageRequests.Contains(CameraId);
+}
 
-	if (ImageRequest->RenderRequest.IsValid())
+void UTempoCameraServiceSubsystem::SendImage(int32 CameraId, int32 FrameCounter, FTextureRenderTargetResource* TextureResource)
+{
+	checkf(PendingImageRequests.Contains(CameraId), TEXT("Camera %d sent image but was not requested"), CameraId);
+
+	const UTempoSensorsSettings* TempoSensorsSettings = GetDefault<UTempoSensorsSettings>();
+	TArray<TUniquePtr<FRenderRequest>>& RenderRequestBuffer = PendingRenderRequests.FindOrAdd(CameraId);
+	if (RenderRequestBuffer.Num() > TempoSensorsSettings->GetMaxCameraRenderBufferSize())
 	{
 		UE_LOG(LogTempoSensors, Warning, TEXT("Fell behind while rendering images from camera %d. Dropping image."), CameraId);
 		return;
 	}
 
-	ImageRequest->RenderRequest = MakeUnique<FRenderRequest>(TextureResource->GetSizeXY());
+	FRenderRequest* RenderRequest = new FRenderRequest(TextureResource->GetSizeXY(), FrameCounter);
 	
 	struct FReadSurfaceContext{
 		FRenderTarget* SrcRenderTarget;
@@ -154,7 +206,7 @@ void UTempoCameraServiceSubsystem::MaybeSendImage(int32 CameraId, FTextureRender
 
 	FReadSurfaceContext Context = {
 		TextureResource,
-		&ImageRequest->RenderRequest->Image,
+		&RenderRequest->Image,
 		FIntRect(0,0,TextureResource->GetSizeX(), TextureResource->GetSizeY()),
 		FReadSurfaceDataFlags(RCM_UNorm, CubeFace_MAX)
 	};
@@ -170,5 +222,6 @@ void UTempoCameraServiceSubsystem::MaybeSendImage(int32 CameraId, FTextureRender
 		);
 	});
 	
-	ImageRequest->RenderRequest->RenderFence.BeginFence();
+	RenderRequest->RenderFence.BeginFence();
+	RenderRequestBuffer.Emplace(RenderRequest);
 }

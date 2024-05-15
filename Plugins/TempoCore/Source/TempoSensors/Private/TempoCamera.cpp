@@ -4,51 +4,127 @@
 
 #include "TempoCameraServiceSubsystem.h"
 
-#include "Engine/TextureRenderTarget2D.h"
+#include "TempoCoreSettings.h"
 
-#include "ImageUtils.h"
+#include "Engine/TextureRenderTarget2D.h"
 
 UTempoCamera::UTempoCamera()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+	CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+	ShowFlags.SetAntiAliasing(true);
+	bCaptureEveryFrame = false;
+	bCaptureOnMovement = false;
+	bTickInEditor = false;
+	bAlwaysPersistRenderingState = true;
 }
 
 void UTempoCamera::BeginPlay()
 {
 	Super::BeginPlay();
-
-	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &UTempoCamera::SendImage, RateHz, true);
+	
+	UpdateRenderTarget();
+	
+	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &UTempoCamera::MaybeCapture, 1.0 / RateHz, true);
 }
 
-void UTempoCamera::SendImage()
+// void UTempoCamera::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
+// {
+// 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
+//
+// 	UE_LOG(LogTemp, Warning, TEXT("Tick for frame %d from camera %d at %f"), FrameCounter, CameraId, GetWorld()->GetTimeSeconds());
+// }
+
+void UTempoCamera::UpdateSceneCaptureContents(FSceneInterface* Scene)
 {
+	UE_LOG(LogTemp, Warning, TEXT("UpdateSceneCaptureContents for frame %d from camera %d at %f"), FrameCounter, CameraId, GetWorld()->GetTimeSeconds());
+
+	Super::UpdateSceneCaptureContents(Scene);
+
+	UTempoCameraServiceSubsystem* CameraSubsystem = GetWorld()->GetSubsystem<UTempoCameraServiceSubsystem>();
+	
+	if (CameraSubsystem && CameraSubsystem->HasPendingRequestForCamera(CameraId))
+	{
+		CameraSubsystem->SendImage(CameraId, FrameCounter, TextureTarget->GameThread_GetRenderTargetResource());
+		FrameCounter++;
+	}
+
+	// bCaptureQueued = false;
+}
+
+void UTempoCamera::MaybeCapture()
+{
+	UE_LOG(LogTemp, Warning, TEXT("MaybeCapture for frame %d from Camera %d at %f"), FrameCounter, CameraId, GetWorld()->GetTimeSeconds(), GetWorld()->WorldType);
+
+	UTempoCameraServiceSubsystem* CameraSubsystem = GetWorld()->GetSubsystem<UTempoCameraServiceSubsystem>();
+	
+	if (!CameraSubsystem || !CameraSubsystem->HasPendingRequestForCamera(CameraId) || bCaptureQueued)
+	{
+		return;
+	}
+
 	if (TextureTarget)
 	{
-		if (UTempoCameraServiceSubsystem* CameraSubsystem = GetWorld()->GetSubsystem<UTempoCameraServiceSubsystem>())
+		if (GetDefault<UTempoCoreSettings>()->GetTimeMode() == ETimeMode::FixedStep)
 		{
-			CameraSubsystem->MaybeSendImage(CameraId, TextureTarget->GameThread_GetRenderTargetResource());
+			CaptureScene();
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("CaptureSceneDeferred for frame %d from Camera %d at %f"), FrameCounter, CameraId, GetWorld()->GetTimeSeconds(), GetWorld()->WorldType);
+			if (GetWorld()->WorldType == EWorldType::PIE || GetWorld()->WorldType == EWorldType::Game)
+			{
+				CaptureSceneDeferred();
+				// bCaptureQueued = true;
+			}
 		}
 	}
 }
 
-void UTempoCamera::RunCompressionTest()
+void UTempoCamera::SetSizeXY(const FIntPoint& SizeXYIn)
 {
-	const int32 SizeX = TextureTarget->GameThread_GetRenderTargetResource()->GetSizeX();
-	const int32 SizeY = TextureTarget->GameThread_GetRenderTargetResource()->GetSizeY();
-	TArray<FColor> ImageData;
-	ImageData.Reserve(SizeX * SizeY);
-	TextureTarget->GameThread_GetRenderTargetResource()->ReadPixels(ImageData);
+	SizeXY = SizeXYIn;
 
-	const float UncompressedSize = SizeX * SizeY * 4.0;
-	constexpr int32 Repeat = 10;
-	for (int32 Quality = 100; Quality >= 40; Quality -= 15)
+	UpdateRenderTarget();
+}
+
+void UTempoCamera::SetImageType(EImageType ImageTypeIn)
+{
+	ImageType = ImageTypeIn;
+
+	UpdatePostProcessMaterial();
+	UpdateRenderTarget();
+}
+
+void UTempoCamera::UpdateRenderTarget()
+{
+	UTextureRenderTarget2D* RenderTarget2D = NewObject<UTextureRenderTarget2D>(this);
+
+	RenderTarget2D->TargetGamma = GEngine->GetDisplayGamma();
+	RenderTarget2D->InitAutoFormat(256, 256);
+	RenderTarget2D->InitCustomFormat(SizeXY.X, SizeXY.Y, PF_B8G8R8A8, true);
+	RenderTarget2D->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
+	RenderTarget2D->bGPUSharedFlag = true;
+
+	TextureTarget = RenderTarget2D;
+}
+
+void UTempoCamera::UpdatePostProcessMaterial()
+{
+	
+}
+
+#if WITH_EDITOR
+void UTempoCamera::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
+{
+	if (PropertyChangedEvent.Property->GetName() == GET_MEMBER_NAME_CHECKED(UTempoCamera, UTempoCamera::SizeXY))
 	{
-		const double Start = FPlatformTime::Seconds();
-		TArray64<uint8> CompressedData;
-		for (int32 Iter = 0; Iter < Repeat; ++Iter)
-		{
-			FImageUtils::CompressImage(CompressedData, TEXT("jpg"), FImageView(ImageData.GetData(), SizeX, SizeY), Quality);
-		}
-		UE_LOG(LogTemp, Warning, TEXT("Quality: %d Compression: %f Time: %f"), Quality, CompressedData.Num() / UncompressedSize, (FPlatformTime::Seconds() - Start) / 10.0);
+		UpdateRenderTarget();
+	}
+	if (PropertyChangedEvent.Property->GetName() == GET_MEMBER_NAME_CHECKED(UTempoCamera, UTempoCamera::ImageType))
+	{
+		UpdateRenderTarget();
+		UpdatePostProcessMaterial();
 	}
 }
+#endif
