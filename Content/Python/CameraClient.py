@@ -36,11 +36,12 @@ async def stream_images_async(camera_id):
             end = time.time()
             diff = end - start
             print("Got {} images in {} seconds from camera {} ({} per second)".format(count, diff, camera_id, count / diff))
-        show_image(image, camera_id)
+        # show_image(image, camera_id)
 
 
 async def main():
-    await asyncio.gather(stream_images_async(3))
+    await asyncio.gather(stream_images_async(0), stream_images_async(1), stream_images_async(2), stream_images_async(3),
+                         stream_images_async(4), stream_images_async(5), stream_images_async(6), stream_images_async(7))
 
 
 if __name__ == "__main__":
