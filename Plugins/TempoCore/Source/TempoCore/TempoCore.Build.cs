@@ -41,6 +41,7 @@ public class TempoCore : ModuleRules
 				"UMG",
 				// Tempo
 				"TempoCoreShared",
+				"TempoSensors",
 				"TempoTime",
 			}
 			);

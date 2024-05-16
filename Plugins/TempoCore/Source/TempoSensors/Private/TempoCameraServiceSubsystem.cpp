@@ -154,7 +154,7 @@ void UTempoCameraServiceSubsystem::Tick(float DeltaTime)
 				// Compress
 				TArray64<uint8> CompressedData;
 				FImageUtils::CompressImage(CompressedData,
-							TEXT("png"),
+							TEXT("jpg"),
 							FImageView(RenderRequest->Image.GetData(), RenderRequest->ImageSize.X, RenderRequest->ImageSize.Y),
 							ImageRequest.Quality);
 
@@ -163,6 +163,8 @@ void UTempoCameraServiceSubsystem::Tick(float DeltaTime)
 				Image.set_width(RenderRequest->ImageSize.X);
 				Image.set_height(RenderRequest->ImageSize.Y);
 				Image.set_data(CompressedData.GetData(), CompressedData.Num());
+				Image.set_sequence_id(RenderRequest->FrameCounter);
+				// Image.set_capture_time()
 
 				// Send
 				ImageRequest.ResponseContinuation.ExecuteIfBound(Image, grpc::Status_OK);

@@ -26,7 +26,6 @@ public class TempoSensors : TempoModuleRules
 			new string[]
 			{
 				"Core",
-				"Engine",
 			}
 			);
 			
@@ -37,6 +36,7 @@ public class TempoSensors : TempoModuleRules
 				// Unreal
 				"CoreUObject",
 				"DeveloperSettings",
+				"Engine",
 				"RenderCore",
 				"RHI",
 				// Tempo

@@ -58,7 +58,7 @@ void UTempoCamera::MaybeCapture()
 
 	UTempoCameraServiceSubsystem* CameraSubsystem = GetWorld()->GetSubsystem<UTempoCameraServiceSubsystem>();
 	
-	if (!CameraSubsystem || !CameraSubsystem->HasPendingRequestForCamera(CameraId) || bCaptureQueued)
+	if (!CameraSubsystem || !CameraSubsystem->HasPendingRequestForCamera(CameraId))
 	{
 		return;
 	}
