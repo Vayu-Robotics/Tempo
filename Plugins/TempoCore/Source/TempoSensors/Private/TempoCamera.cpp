@@ -10,7 +10,6 @@
 
 UTempoCamera::UTempoCamera()
 {
-	PrimaryComponentTick.bCanEverTick = true;
 	CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 	ShowFlags.SetAntiAliasing(true);
 	bCaptureEveryFrame = false;
@@ -28,55 +27,34 @@ void UTempoCamera::BeginPlay()
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &UTempoCamera::MaybeCapture, 1.0 / RateHz, true);
 }
 
-// void UTempoCamera::TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction)
-// {
-// 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-//
-// 	UE_LOG(LogTemp, Warning, TEXT("Tick for frame %d from camera %d at %f"), FrameCounter, CameraId, GetWorld()->GetTimeSeconds());
-// }
-
 void UTempoCamera::UpdateSceneCaptureContents(FSceneInterface* Scene)
 {
-	UE_LOG(LogTemp, Warning, TEXT("UpdateSceneCaptureContents for frame %d from camera %d at %f"), FrameCounter, CameraId, GetWorld()->GetTimeSeconds());
-
 	Super::UpdateSceneCaptureContents(Scene);
 
 	UTempoCameraServiceSubsystem* CameraSubsystem = GetWorld()->GetSubsystem<UTempoCameraServiceSubsystem>();
-	
 	if (CameraSubsystem && CameraSubsystem->HasPendingRequestForCamera(CameraId))
 	{
 		CameraSubsystem->SendImage(CameraId, FrameCounter, TextureTarget->GameThread_GetRenderTargetResource());
 		FrameCounter++;
 	}
-
-	// bCaptureQueued = false;
 }
 
 void UTempoCamera::MaybeCapture()
 {
-	UE_LOG(LogTemp, Warning, TEXT("MaybeCapture for frame %d from Camera %d at %f"), FrameCounter, CameraId, GetWorld()->GetTimeSeconds(), GetWorld()->WorldType);
-
-	UTempoCameraServiceSubsystem* CameraSubsystem = GetWorld()->GetSubsystem<UTempoCameraServiceSubsystem>();
-	
-	if (!CameraSubsystem || !CameraSubsystem->HasPendingRequestForCamera(CameraId))
-	{
-		return;
-	}
-
-	if (TextureTarget)
+	const UTempoCameraServiceSubsystem* CameraSubsystem = GetWorld()->GetSubsystem<UTempoCameraServiceSubsystem>();
+	if (TextureTarget && CameraSubsystem && CameraSubsystem->HasPendingRequestForCamera(CameraId))
 	{
 		if (GetDefault<UTempoCoreSettings>()->GetTimeMode() == ETimeMode::FixedStep)
 		{
+			// In fixed step mode we block the game thread to render the image immediately.
+			// It will then be read and sent before the end of the current frame.
 			CaptureScene();
 		}
 		else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("CaptureSceneDeferred for frame %d from Camera %d at %f"), FrameCounter, CameraId, GetWorld()->GetTimeSeconds(), GetWorld()->WorldType);
-			if (GetWorld()->WorldType == EWorldType::PIE || GetWorld()->WorldType == EWorldType::Game)
-			{
-				CaptureSceneDeferred();
-				// bCaptureQueued = true;
-			}
+			// Otherwise, we render the frame along with the main render pass.
+			// It will get read and sent one or two frames after this one.
+			CaptureSceneDeferred();
 		}
 	}
 }

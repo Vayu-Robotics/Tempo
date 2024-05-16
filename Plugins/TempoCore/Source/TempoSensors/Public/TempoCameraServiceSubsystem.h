@@ -25,12 +25,12 @@ namespace TempoSensors
 	class Image;
 }
 
-struct FRenderRequest
+struct FTextureRead
 {
-	FRenderRequest(const FIntPoint& ImageSizeIn, int32 FrameCounterIn)
+	FTextureRead(const FIntPoint& ImageSizeIn, int32 FrameCounterIn)
 		: ImageSize(ImageSizeIn), FrameCounter(FrameCounterIn), Image(TArray(&FColor::Green, ImageSize.X * ImageSize.Y)) {}
 	
-	FIntPoint ImageSize = FIntPoint::ZeroValue;
+	FIntPoint ImageSize;
 	int32 FrameCounter;
 	TArray<FColor> Image;
 	FRenderCommandFence RenderFence;
@@ -41,8 +41,37 @@ struct FImageRequest
 	FImageRequest(int32 QualityIn, const TResponseDelegate<TempoSensors::Image>& ResponseContinuationIn)
 		: Quality(QualityIn), ResponseContinuation(ResponseContinuationIn) {}
 	
-	int32 Quality = 100;
+	int32 Quality;
 	TResponseDelegate<TempoSensors::Image> ResponseContinuation;
+};
+
+struct FRequestedCamera
+{
+	TArray<FImageRequest> PendingImageRequests;
+	
+	int32 GetNumPendingTextureReads() const { return PendingTextureReads.Num(); }
+	
+	bool HasOutstandingTextureReads() const { return !PendingTextureReads.IsEmpty() && !PendingTextureReads[0]->RenderFence.IsFenceComplete(); }
+	
+	void EnqueuePendingTextureRead(FTextureRead* TextureRead)
+	{
+		PendingTextureReads.Emplace(TextureRead);
+	}
+
+	TUniquePtr<FTextureRead> DequeuePendingTextureRead()
+	{
+		if (!PendingTextureReads.IsEmpty() && PendingTextureReads[0]->RenderFence.IsFenceComplete())
+		{
+			TUniquePtr<FTextureRead> TextureRead(PendingTextureReads[0].Release());
+			PendingTextureReads.RemoveAt(0);
+			return MoveTemp(TextureRead);
+		}
+		return nullptr;
+	}
+
+private:
+	// A "Queue" of pending texture reads.
+	TArray<TUniquePtr<FTextureRead>> PendingTextureReads;
 };
 
 UCLASS()
@@ -65,7 +94,5 @@ private:
 
 	void StreamImages(const TempoSensors::StreamImagesRequest& Request, const TResponseDelegate<TempoSensors::Image>& ResponseContinuation);
 	
-	TMap<int32, FImageRequest> PendingImageRequests;
-	
-	TMap<int32, TArray<TUniquePtr<FRenderRequest>>> PendingRenderRequests;
+	TMap<int32, FRequestedCamera> RequestedCameras;
 };

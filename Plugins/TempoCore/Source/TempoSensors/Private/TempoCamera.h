@@ -27,9 +27,7 @@ public:
 	void SetSizeXY(const FIntPoint& SizeXYIn);
 
 	void SetImageType(EImageType ImageTypeIn);
-
-	// void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
-
+	
 	virtual void UpdateSceneCaptureContents(FSceneInterface* Scene) override;
 
 #if WITH_EDITOR
@@ -63,7 +61,4 @@ private:
 	TEnumAsByte<EImageType> ImageType = EImageType::RGB;
 	
 	FTimerHandle TimerHandle;
-	//
-	// UPROPERTY()
-	// bool bCaptureQueued = false;
 };

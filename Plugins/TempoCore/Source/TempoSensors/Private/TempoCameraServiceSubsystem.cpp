@@ -73,10 +73,10 @@ void UTempoCameraServiceSubsystem::GetAvailableCameras(const TempoSensors::Avail
 
 int32 QualityFromCompressionLevel(TempoSensors::CompressionLevel CompressionLevel)
 {
-	// Inspired by FJpegImageWrapper::Compress()
+	// See FJpegImageWrapper::Compress() for an explanation of these levels
 	switch (CompressionLevel)
 	{
-	case TempoSensors::LOSSLESS:
+	case TempoSensors::MIN:
 		{
 			return 100;
 		}
@@ -115,22 +115,20 @@ int32 QualityFromCompressionLevel(TempoSensors::CompressionLevel CompressionLeve
 void UTempoCameraServiceSubsystem::StreamImages(const TempoSensors::StreamImagesRequest& Request, const TResponseDelegate<TempoSensors::Image>& ResponseContinuation)
 {
 	const int32 Quality = QualityFromCompressionLevel(Request.compression_level());
-	PendingImageRequests.Add(Request.camera_id(), FImageRequest(Quality, ResponseContinuation));
+	RequestedCameras.FindOrAdd(Request.camera_id()).PendingImageRequests.Add(FImageRequest(Quality, ResponseContinuation));
 }
 
 void UTempoCameraServiceSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// In some cases (always in synchronous mode or when configured to do so in asynchronous mode) we block the
-	// game thread to flush all rendering commands and send the images at the first available opportunity.
-	const UTempoSensorsSettings* TempoSensorsSettings = GetDefault<UTempoSensorsSettings>();
-	const UTempoCoreSettings* TempoCoreSettings = GetDefault<UTempoCoreSettings>();
-	if (TempoSensorsSettings->GetBlockOnCameraRender() || TempoCoreSettings->GetTimeMode() == ETimeMode::FixedStep)
+	// In fixed step mode we block the game thread on any pending texture reads.
+	// This guarantees they will be sent out in the same frame when they were captured.
+	if (GetDefault<UTempoCoreSettings>()->GetTimeMode() == ETimeMode::FixedStep)
 	{
-		for (const auto& PendingRenderRequest : PendingRenderRequests)
+		for (const auto& PendingImageReqeust : RequestedCameras)
 		{
-			if (!PendingRenderRequest.Value.IsEmpty() && !PendingRenderRequest.Value[0]->RenderFence.IsFenceComplete())
+			if (PendingImageReqeust.Value.HasOutstandingTextureReads())
 			{
 				FlushRenderingCommands();
 				break;
@@ -138,38 +136,35 @@ void UTempoCameraServiceSubsystem::Tick(float DeltaTime)
 		}
 	}
 	
-	for (auto PendingImageRequestIt = PendingImageRequests.CreateIterator(); PendingImageRequestIt; ++PendingImageRequestIt)
+	for (auto& Elem : RequestedCameras)
 	{
-		const int32 CameraId = PendingImageRequestIt->Key;
-		FImageRequest& ImageRequest = PendingImageRequestIt->Value;
-		if (auto* RenderRequestBuffer = PendingRenderRequests.Find(CameraId))
+		FRequestedCamera& RequestedCamera = Elem.Value;
+		if (const TUniquePtr<FTextureRead> TextureRead = RequestedCamera.DequeuePendingTextureRead())
 		{
-			while (!RenderRequestBuffer->IsEmpty() && (*RenderRequestBuffer)[0]->RenderFence.IsFenceComplete())
+			// Cache to avoid duplicated compression for clients who requested the same quality.
+			TMap<int32, TArray64<uint8>> CompressedCache;
+			for (auto ImageRequest = RequestedCamera.PendingImageRequests.CreateIterator(); ImageRequest; ++ImageRequest)
 			{
-				const TUniquePtr<FRenderRequest> RenderRequest((*RenderRequestBuffer)[0].Release());
-				RenderRequestBuffer->RemoveAt(0);
+				TArray64<uint8>& CompressedData = CompressedCache.FindOrAdd(ImageRequest->Quality);
+				if (CompressedData.IsEmpty())
+				{
+					FImageUtils::CompressImage(CompressedData,
+						TEXT("jpg"),
+						FImageView(TextureRead->Image.GetData(), TextureRead->ImageSize.X, TextureRead->ImageSize.Y),
+						ImageRequest->Quality);
+				}
 
-				UE_LOG(LogTemp, Warning, TEXT("Sending frame %d from Camera %d at %f"), RenderRequest->FrameCounter, CameraId, GetWorld()->GetTimeSeconds());
-				
-				// Compress
-				TArray64<uint8> CompressedData;
-				FImageUtils::CompressImage(CompressedData,
-							TEXT("jpg"),
-							FImageView(RenderRequest->Image.GetData(), RenderRequest->ImageSize.X, RenderRequest->ImageSize.Y),
-							ImageRequest.Quality);
-
-				// Pack into message
 				TempoSensors::Image Image;	
-				Image.set_width(RenderRequest->ImageSize.X);
-				Image.set_height(RenderRequest->ImageSize.Y);
+				Image.set_width(TextureRead->ImageSize.X);
+				Image.set_height(TextureRead->ImageSize.Y);
 				Image.set_data(CompressedData.GetData(), CompressedData.Num());
-				Image.set_sequence_id(RenderRequest->FrameCounter);
-				// Image.set_capture_time()
+				Image.set_sequence_id(TextureRead->FrameCounter);
+				Image.set_capture_time(1.0);
+				Image.set_transmission_time(1.0);
 
-				// Send
-				ImageRequest.ResponseContinuation.ExecuteIfBound(Image, grpc::Status_OK);
+				ImageRequest->ResponseContinuation.ExecuteIfBound(Image, grpc::Status_OK);
 
-				PendingImageRequests.Remove(CameraId);
+				ImageRequest.RemoveCurrent();
 			}
 		}
 	}
@@ -182,22 +177,24 @@ TStatId UTempoCameraServiceSubsystem::GetStatId() const
 
 bool UTempoCameraServiceSubsystem::HasPendingRequestForCamera(int32 CameraId) const
 {
-	return PendingImageRequests.Contains(CameraId);
+	return RequestedCameras.Contains(CameraId) && !RequestedCameras[CameraId].PendingImageRequests.IsEmpty();
 }
 
 void UTempoCameraServiceSubsystem::SendImage(int32 CameraId, int32 FrameCounter, FTextureRenderTargetResource* TextureResource)
 {
-	checkf(PendingImageRequests.Contains(CameraId), TEXT("Camera %d sent image but was not requested"), CameraId);
-
-	const UTempoSensorsSettings* TempoSensorsSettings = GetDefault<UTempoSensorsSettings>();
-	TArray<TUniquePtr<FRenderRequest>>& RenderRequestBuffer = PendingRenderRequests.FindOrAdd(CameraId);
-	if (RenderRequestBuffer.Num() > TempoSensorsSettings->GetMaxCameraRenderBufferSize())
+	FRequestedCamera* RequestedCamera = RequestedCameras.Find(CameraId);
+	if (!RequestedCamera)
+	{
+		checkf(false, TEXT("Camera %d sent image but was not requested"), CameraId);
+	}
+	
+	if (RequestedCamera->GetNumPendingTextureReads() > GetDefault<UTempoSensorsSettings>()->GetMaxCameraRenderBufferSize())
 	{
 		UE_LOG(LogTempoSensors, Warning, TEXT("Fell behind while rendering images from camera %d. Dropping image."), CameraId);
 		return;
 	}
 
-	FRenderRequest* RenderRequest = new FRenderRequest(TextureResource->GetSizeXY(), FrameCounter);
+	FTextureRead* TextureRead = new FTextureRead(TextureResource->GetSizeXY(), FrameCounter);
 	
 	struct FReadSurfaceContext{
 		FRenderTarget* SrcRenderTarget;
@@ -208,7 +205,7 @@ void UTempoCameraServiceSubsystem::SendImage(int32 CameraId, int32 FrameCounter,
 
 	FReadSurfaceContext Context = {
 		TextureResource,
-		&RenderRequest->Image,
+		&TextureRead->Image,
 		FIntRect(0,0,TextureResource->GetSizeX(), TextureResource->GetSizeY()),
 		FReadSurfaceDataFlags(RCM_UNorm, CubeFace_MAX)
 	};
@@ -224,6 +221,6 @@ void UTempoCameraServiceSubsystem::SendImage(int32 CameraId, int32 FrameCounter,
 		);
 	});
 	
-	RenderRequest->RenderFence.BeginFence();
-	RenderRequestBuffer.Emplace(RenderRequest);
+	TextureRead->RenderFence.BeginFence();
+	RequestedCamera->EnqueuePendingTextureRead(TextureRead);
 }

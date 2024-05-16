@@ -9,7 +9,7 @@ enum ImageType {
 }
 
 enum CompressionLevel {
-  LOSSLESS = 0; // 100
+  MIN = 0; // 100
   VERY_LOW = 1; // 90
   LOW = 2; // 80
   MID = 3; // 70
@@ -28,8 +28,8 @@ message CameraDescriptor {
 }
 
 message Image {
-  uint32 width = 1;
-  uint32 height = 2;
+  int32 width = 1;
+  int32 height = 2;
   bytes data = 3;
   uint64 sequence_id = 4;
   double capture_time = 5;
