@@ -5,12 +5,14 @@
 #include "TempoCameraServiceSubsystem.h"
 
 #include "TempoCoreSettings.h"
+#include "TempoSensorsSettings.h"
 
 #include "Engine/TextureRenderTarget2D.h"
 
 UTempoCamera::UTempoCamera()
 {
-	CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
+	PrimaryComponentTick.bStartWithTickEnabled = false;
+	CaptureSource = ESceneCaptureSource::SCS_SceneDepth;
 	ShowFlags.SetAntiAliasing(true);
 	bCaptureEveryFrame = false;
 	bCaptureOnMovement = false;
@@ -22,7 +24,7 @@ void UTempoCamera::BeginPlay()
 {
 	Super::BeginPlay();
 	
-	UpdateRenderTarget();
+	// UpdateRenderTarget();
 	
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &UTempoCamera::MaybeCapture, 1.0 / RateHz, true);
 }
@@ -34,8 +36,8 @@ void UTempoCamera::UpdateSceneCaptureContents(FSceneInterface* Scene)
 	UTempoCameraServiceSubsystem* CameraSubsystem = GetWorld()->GetSubsystem<UTempoCameraServiceSubsystem>();
 	if (CameraSubsystem && CameraSubsystem->HasPendingRequestForCamera(CameraId))
 	{
-		CameraSubsystem->SendImage(CameraId, FrameCounter, TextureTarget->GameThread_GetRenderTargetResource());
-		FrameCounter++;
+		CameraSubsystem->SendImage(CameraId, SequenceId, TextureTarget->GameThread_GetRenderTargetResource());
+		SequenceId++;
 	}
 }
 
@@ -77,31 +79,50 @@ void UTempoCamera::SetImageType(EImageType ImageTypeIn)
 void UTempoCamera::UpdateRenderTarget()
 {
 	UTextureRenderTarget2D* RenderTarget2D = NewObject<UTextureRenderTarget2D>(this);
-
+	
 	RenderTarget2D->TargetGamma = GEngine->GetDisplayGamma();
 	RenderTarget2D->InitAutoFormat(256, 256);
 	RenderTarget2D->InitCustomFormat(SizeXY.X, SizeXY.Y, PF_B8G8R8A8, true);
-	RenderTarget2D->RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
+	RenderTarget2D->RenderTargetFormat = ETextureRenderTargetFormat::RTF_R8;
 	RenderTarget2D->bGPUSharedFlag = true;
-
-	TextureTarget = RenderTarget2D;
+	
+	// TextureTarget = RenderTarget2D;
 }
 
 void UTempoCamera::UpdatePostProcessMaterial()
 {
-	
+	// PostProcessSettings.WeightedBlendables.Array.Empty();
+	// switch (ImageType)
+	// {
+	// case EImageType::COLOR:
+	// 	{
+	// 		PostProcessSettings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0,
+	// 			GetDefault<UTempoSensorsSettings>()->GetColorPostProcessMaterial()));
+	// 		break;
+	// 	}
+	// case EImageType::DEPTH_AND_LABELS:
+	// 	{
+	// 		PostProcessSettings.WeightedBlendables.Array.Add(FWeightedBlendable(1.0,
+	// 			GetDefault<UTempoSensorsSettings>()->GetDepthAndLabelsPostProcessMaterial()));
+	// 		break;
+	// 	}
+	// default:
+	// 	checkf(false, TEXT("Unhandled ImageType"));
+	// }
 }
 
 #if WITH_EDITOR
 void UTempoCamera::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
-	if (PropertyChangedEvent.Property->GetName() == GET_MEMBER_NAME_CHECKED(UTempoCamera, UTempoCamera::SizeXY))
+	Super::PostEditChangeProperty(PropertyChangedEvent);
+	
+	if (PropertyChangedEvent.Property->GetName() == GET_MEMBER_NAME_CHECKED(UTempoCamera, SizeXY))
 	{
 		UpdateRenderTarget();
 	}
-	if (PropertyChangedEvent.Property->GetName() == GET_MEMBER_NAME_CHECKED(UTempoCamera, UTempoCamera::ImageType))
+	if (PropertyChangedEvent.Property->GetName() == GET_MEMBER_NAME_CHECKED(UTempoCamera, ImageType))
 	{
-		UpdateRenderTarget();
+		UE_LOG(LogTemp, Warning, TEXT("UpdatePostProcessMaterial"));
 		UpdatePostProcessMaterial();
 	}
 }

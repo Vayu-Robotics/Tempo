@@ -31,22 +31,18 @@ TempoSensors::ImageType ToProtoImageType(EImageType ImageType)
 {
 	switch (ImageType)
 	{
-	case EImageType::RGB:
+	case EImageType::COLOR:
 		{
-			return TempoSensors::RBG;
+			return TempoSensors::COLOR;
 		}
-	case EImageType::DEPTH:
+	case EImageType::DEPTH_AND_LABELS:
 		{
-			return TempoSensors::DEPTH;
-		}
-	case EImageType::SEMANTIC_LABELS:
-		{
-			return TempoSensors::SEMANTIC_LABELS;
+			return TempoSensors::DEPTH_AND_LABELS;
 		}
 	default:
 		{
 			checkf(false, TEXT("Unhandled image type"));
-			return TempoSensors::RBG;
+			return TempoSensors::COLOR;
 		}
 	}
 }
@@ -158,9 +154,9 @@ void UTempoCameraServiceSubsystem::Tick(float DeltaTime)
 				Image.set_width(TextureRead->ImageSize.X);
 				Image.set_height(TextureRead->ImageSize.Y);
 				Image.set_data(CompressedData.GetData(), CompressedData.Num());
-				Image.set_sequence_id(TextureRead->FrameCounter);
-				Image.set_capture_time(1.0);
-				Image.set_transmission_time(1.0);
+				Image.mutable_header()->set_sequence_id(TextureRead->SequenceId);
+				Image.mutable_header()->set_capture_time(TextureRead->CaptureTime);
+				Image.mutable_header()->set_transmission_time(GetWorld()->GetTimeSeconds());
 
 				ImageRequest->ResponseContinuation.ExecuteIfBound(Image, grpc::Status_OK);
 
@@ -180,7 +176,7 @@ bool UTempoCameraServiceSubsystem::HasPendingRequestForCamera(int32 CameraId) co
 	return RequestedCameras.Contains(CameraId) && !RequestedCameras[CameraId].PendingImageRequests.IsEmpty();
 }
 
-void UTempoCameraServiceSubsystem::SendImage(int32 CameraId, int32 FrameCounter, FTextureRenderTargetResource* TextureResource)
+void UTempoCameraServiceSubsystem::SendImage(int32 CameraId, int32 SequenceId, FTextureRenderTargetResource* TextureResource)
 {
 	FRequestedCamera* RequestedCamera = RequestedCameras.Find(CameraId);
 	if (!RequestedCamera)
@@ -194,7 +190,10 @@ void UTempoCameraServiceSubsystem::SendImage(int32 CameraId, int32 FrameCounter,
 		return;
 	}
 
-	FTextureRead* TextureRead = new FTextureRead(TextureResource->GetSizeXY(), FrameCounter);
+	FTextureRead* TextureRead = new FTextureRead(
+		TextureResource->GetSizeXY(),
+		SequenceId,
+		GetWorld()->GetTimeSeconds());
 	
 	struct FReadSurfaceContext{
 		FRenderTarget* SrcRenderTarget;

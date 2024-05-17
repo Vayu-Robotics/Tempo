@@ -49,7 +49,7 @@ private:
 	int32 CameraId = 0;
 
 	UPROPERTY(EditAnywhere)
-	int32 FrameCounter = 0;
+	int32 SequenceId = 0;
 	
 	UPROPERTY(EditAnywhere)
 	float RateHz = 10.0;
@@ -58,7 +58,7 @@ private:
 	FIntPoint SizeXY = FIntPoint(960, 540);
 
 	UPROPERTY(EditAnywhere)
-	TEnumAsByte<EImageType> ImageType = EImageType::RGB;
+	TEnumAsByte<EImageType> ImageType = EImageType::COLOR;
 	
 	FTimerHandle TimerHandle;
 };

@@ -27,11 +27,12 @@ namespace TempoSensors
 
 struct FTextureRead
 {
-	FTextureRead(const FIntPoint& ImageSizeIn, int32 FrameCounterIn)
-		: ImageSize(ImageSizeIn), FrameCounter(FrameCounterIn), Image(TArray(&FColor::Green, ImageSize.X * ImageSize.Y)) {}
+	FTextureRead(const FIntPoint& ImageSizeIn, int32 SequenceIdIn, double CaptureTimeIn)
+		: ImageSize(ImageSizeIn), SequenceId(SequenceIdIn), CaptureTime(CaptureTimeIn), Image(TArray(&FColor::Green, ImageSize.X * ImageSize.Y)) {}
 	
 	FIntPoint ImageSize;
-	int32 FrameCounter;
+	int32 SequenceId;
+	double CaptureTime;
 	TArray<FColor> Image;
 	FRenderCommandFence RenderFence;
 };
@@ -87,7 +88,7 @@ public:
 
 	bool HasPendingRequestForCamera(int32 CameraId) const;
 
-	void SendImage(int32 CameraId, int32 FrameCounter, FTextureRenderTargetResource* TextureResource);
+	void SendImage(int32 CameraId, int32 SequenceId, FTextureRenderTargetResource* TextureResource);
 
 private:
 	void GetAvailableCameras(const TempoSensors::AvailableCamerasRequest& Request, const TResponseDelegate<TempoSensors::AvailableCamerasResponse>& ResponseContinuation) const;

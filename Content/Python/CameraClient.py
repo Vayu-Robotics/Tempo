@@ -41,7 +41,9 @@ async def stream_images_async(camera_id):
 
 async def main():
     await asyncio.gather(stream_images_async(0), stream_images_async(1), stream_images_async(2), stream_images_async(3),
-                         stream_images_async(4), stream_images_async(5), stream_images_async(6), stream_images_async(7))
+                         stream_images_async(4), stream_images_async(5), stream_images_async(6), stream_images_async(7),
+                         stream_images_async(8), stream_images_async(9), stream_images_async(10), stream_images_async(11),
+                         stream_images_async(12), stream_images_async(13), stream_images_async(14), stream_images_async(15))
 
 
 if __name__ == "__main__":
