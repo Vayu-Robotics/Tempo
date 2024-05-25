@@ -11,7 +11,7 @@
 UTempoDepthCamera::UTempoDepthCamera()
 {
 	MeasurementTypes = { EMeasurementType::DEPTH_IMAGE };
-	RenderTargetFormat = ETextureRenderTargetFormat::RTF_R32f;
+	RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA16f;
 	CaptureSource = ESceneCaptureSource::SCS_SceneDepth;
 }
 

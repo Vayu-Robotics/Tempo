@@ -70,9 +70,9 @@ void UTempoSceneCaptureComponent2D::InitRenderTarget()
 	UTextureRenderTarget2D* RenderTarget2D = NewObject<UTextureRenderTarget2D>(this);
 	
 	RenderTarget2D->TargetGamma = GEngine->GetDisplayGamma();
-	RenderTarget2D->InitAutoFormat(SizeXY.X, SizeXY.Y);
 	RenderTarget2D->RenderTargetFormat = RenderTargetFormat;
 	RenderTarget2D->bGPUSharedFlag = true;
+	RenderTarget2D->InitAutoFormat(SizeXY.X, SizeXY.Y);
 	
 	TextureTarget = RenderTarget2D;
 }
