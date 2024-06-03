@@ -33,6 +33,8 @@ void UTempoScriptingWorldSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	
 	const UTempoCoreSettings* Settings = GetDefault<UTempoCoreSettings>();
 	ScriptingServer->Initialize(Settings->GetWorldScriptingPort());
+
+	InWorld.AddMovieSceneSequenceTickHandler(FOnMovieSceneSequenceTick::FDelegate::CreateUObject(ScriptingServer, &UTempoScriptingServer::Tick));
 }
 
 void UTempoScriptingWorldSubsystem::Deinitialize()

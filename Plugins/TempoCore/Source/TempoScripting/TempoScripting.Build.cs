@@ -28,8 +28,11 @@ public class TempoScripting : TempoModuleRules
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
+				// Unreal
 				"Core",
 				"gRPC",
+				// Tempo
+				"TempoCoreShared",
 			}
 			);
 			
@@ -40,8 +43,6 @@ public class TempoScripting : TempoModuleRules
 				// Unreal
 				"CoreUObject",
 				"Engine",
-				// Tempo
-				"TempoCoreShared",
 			}
 			);
 		

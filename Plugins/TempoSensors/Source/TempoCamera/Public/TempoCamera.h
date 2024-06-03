@@ -16,16 +16,12 @@
 struct FCameraPixelNoDepth
 {
 	static constexpr bool bSupportsDepth = false; 
+
+	uint8 B() const { return U1; }
+	uint8 G() const { return U2; }
+	uint8 R() const { return U3; }
 	
-	FColor Color() const
-	{
-		return FColor(U1, U2, U3);
-	}
-	
-	uint8 Label() const
-	{
-		return U4;
-	}
+	uint8 Label() const { return U4; }
 
 	// This only exists so it can be used as a template parameter
 	// alongside FCameraPixelWithDepth. We don't want to use a virtual
@@ -49,15 +45,11 @@ struct FCameraPixelWithDepth
 {
 	static constexpr bool bSupportsDepth = true;
 	
-	FColor Color() const
-	{
-		return FColor(U1, U2, U3);
-	}
+	uint8 R() const { return U1; }
+	uint8 G() const { return U2; }
+	uint8 B() const { return U3; }
 	
-	uint8 Label() const
-	{
-		return U4;
-	}
+	uint8 Label() const { return U4; }
 	
 	float Depth(float MinDepth, float MaxDepth, float MaxDiscretizedDepth) const
 	{
@@ -112,9 +104,11 @@ public:
 
 	void RequestMeasurement(const TempoCamera::DepthImageRequest& Request, const TResponseDelegate<TempoCamera::DepthImage>& ResponseContinuation);
 	
-	virtual void FlushMeasurementResponses() override;
+	virtual TOptional<TFuture<void>> FlushMeasurementResponses() override;
 
 	virtual bool HasPendingRenderingCommands() override { return TextureReadQueueNoDepth.HasOutstandingTextureReads() || TextureReadQueueWithDepth.HasOutstandingTextureReads(); }
+
+	virtual void FlushPendingRenderingCommands() const override;
 
 protected:
 	virtual bool HasPendingRequests() const override {return !PendingColorImageRequests.IsEmpty() || !PendingLabelImageRequests.IsEmpty() || !PendingDepthImageRequests.IsEmpty(); }
@@ -128,20 +122,20 @@ protected:
 	bool bDepthEnabled = false;
 
 	// The minimum depth this camera can measure. Will be set to the near clip plane when depth is enabled.
-	UPROPERTY(VisibleAnywhere, Category="Depth", meta=(EditCondition=bHasBegunPlay))
+	UPROPERTY(VisibleAnywhere, Category="Depth")
 	float MinDepth = 10.0; // 10cm
 	
 	// The maximum depth this camera can measure. Should be (very roughly) near the maximum viewable depth.
-	UPROPERTY(VisibleAnywhere, Category="Depth", meta=(EditCondition=bHasBegunPlay))
+	UPROPERTY(VisibleAnywhere, Category="Depth")
 	float MaxDepth = 100000.0; // 1km
 
 	UPROPERTY(VisibleAnywhere)
 	UMaterialInstanceDynamic* PostProcessMaterialInstance= nullptr;
-	
+
 	// Decode the underlying pixel data into responses and send them.
 	template <typename PixelType>
-	void DecodeAndRespond(const TTextureRead<PixelType>* TextureRead);
-
+	TFuture<void> DecodeAndRespond(TUniquePtr<TTextureRead<PixelType>> TextureRead);
+	
 	TArray<FColorImageRequest> PendingColorImageRequests;
 	TArray<FLabelImageRequest> PendingLabelImageRequests;
 	TArray<FDepthImageRequest> PendingDepthImageRequests;

@@ -12,6 +12,34 @@ UTempoScriptingServer::UTempoScriptingServer(FVTableHelper& Helper)
 	: Super(Helper) {}
 UTempoScriptingServer::~UTempoScriptingServer() = default;
 
+grpc_compression_level CompressionLevelTogRPC(EScriptingCompressionLevel TempoLevel)
+{
+	switch (TempoLevel)
+	{
+	case EScriptingCompressionLevel::None:
+		{
+			return GRPC_COMPRESS_LEVEL_NONE;
+		}
+	case EScriptingCompressionLevel::Low:
+		{
+			return GRPC_COMPRESS_LEVEL_LOW;
+		}
+	case EScriptingCompressionLevel::Med:
+		{
+			return GRPC_COMPRESS_LEVEL_MED;
+		}
+	case EScriptingCompressionLevel::High:
+		{
+			return GRPC_COMPRESS_LEVEL_HIGH;
+		}
+	default:
+		{
+			checkf(false, TEXT("Unhandled compression level"));
+			return GRPC_COMPRESS_LEVEL_COUNT;
+		}
+	}
+}
+
 void UTempoScriptingServer::Initialize(int32 Port)
 {
 	const FString ServerAddress = FString::Printf(TEXT("0.0.0.0:%d"), Port);
@@ -21,6 +49,8 @@ void UTempoScriptingServer::Initialize(int32 Port)
 	{
 		Builder.RegisterService(Service.Get());
 	}
+
+	Builder.SetDefaultCompressionLevel(CompressionLevelTogRPC(GetDefault<UTempoCoreSettings>()->GetScriptingCompressionLevel()));
 
 	CompletionQueue.Reset(Builder.AddCompletionQueue().release());
 	Server.Reset(Builder.BuildAndStart().release());
@@ -78,12 +108,26 @@ void UTempoScriptingServer::Tick(float DeltaTime)
 	{
 		return;
 	}
+	TRACE_CPUPROFILER_EVENT_SCOPE(TempoScriptingProcessEvents)
 	
 	const UTempoCoreSettings* Settings = GetDefault<UTempoCoreSettings>();
 	const ETimeMode TimeMode = Settings->GetTimeMode();
 	const int32 MaxEventProcessingTimeMicroSeconds = Settings->GetMaxEventProcessingTime();
 	const double MaxEventProcessingTimeSeconds = MaxEventProcessingTimeMicroSeconds / 1.e6;
 	const int32 MaxEventWaitTimeNanoSeconds = Settings->GetMaxEventWaitTime();
+
+	TSet<int32> ManagersWithPendingWrites;
+	for (const auto& Elem : RequestManagers)
+	{
+		const int32 Tag = Elem.Key;
+		const TSharedPtr<FRequestManager>& RequestManager = Elem.Value;
+		const FRequestManager::EState State = RequestManager->GetState();
+		if (State == FRequestManager::EState::RESPONDING ||
+			State == FRequestManager::EState::FINISHING)
+		{
+			ManagersWithPendingWrites.Add(Tag);
+		}
+	}
 
 	bool bProcessedPendingEvents = false;
 	const double Start = FPlatformTime::Seconds();
@@ -104,6 +148,7 @@ void UTempoScriptingServer::Tick(float DeltaTime)
 			{
 				// Handle the event and then wait for another.
 				HandleEventForTag(*Tag, bOk);
+				ManagersWithPendingWrites.Remove(*Tag);
 				break;
 			}
 		case grpc::CompletionQueue::SHUTDOWN:
@@ -113,8 +158,8 @@ void UTempoScriptingServer::Tick(float DeltaTime)
 			}
 		case grpc::CompletionQueue::TIMEOUT:
 			{
-				// We've processed all the pending events, move on.
-				bProcessedPendingEvents = true;
+				// If we've processed all the pending events (which, in fixed time mode, includes an event for every manager with a pending write), move on.
+				bProcessedPendingEvents = TimeMode == ETimeMode::FixedStep ? ManagersWithPendingWrites.IsEmpty() : true;
 				break;
 			}
 		}

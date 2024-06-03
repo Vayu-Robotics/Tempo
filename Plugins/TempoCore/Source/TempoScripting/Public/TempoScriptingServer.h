@@ -6,6 +6,8 @@
 
 #include "CoreMinimal.h"
 
+#include "TempoCoreSettings.h"
+
 #include "TempoScriptingServer.generated.h"
 
 template <class ResponseType>
@@ -160,8 +162,8 @@ public:
 		check(Base::State == FRequestManager::EState::REQUESTED);
 		Base::ResponseDelegate = TResponseDelegate<ResponseType>::CreateSPLambda(static_cast<FRequestManager*>(this), [this](const ResponseType& Response, grpc::Status Result)
 		{
-			Base::Responder.Finish(Response, Result, &(Base::Tag));
 			Base::State = FRequestManager::EState::FINISHING;
+			Base::Responder.Finish(Response, Result, &(Base::Tag));
 		});
 		Base::Handler->HandleRequest(Base::Request, Base::ResponseDelegate);
 	}
@@ -188,14 +190,20 @@ public:
 			if (!Result.ok())
 			{
 				// Consider non-OK result to mean there are no more responses available.
-				Base::Responder.Finish(Result, &(Base::Tag));
 				Base::State = FRequestManager::EState::FINISHING;
+				Base::Responder.Finish(Result, &(Base::Tag));
 				return;
 			}
-				
-			Base::Responder.Write(Response, &(Base::Tag));
+			
+			grpc::WriteOptions WriteOptions;
+			if (GetDefault<UTempoCoreSettings>()->GetTimeMode() == ETimeMode::FixedStep)
+			{
+				WriteOptions.set_write_through();
+			}
 			Base::State = FRequestManager::EState::RESPONDING;
+			Base::Responder.Write(Response, WriteOptions, &(Base::Tag));
 		});
+		Base::State = FRequestManager::EState::REQUESTED;
 		Base::Handler->HandleRequest(Base::Request, Base::ResponseDelegate);
 	}
 
@@ -209,7 +217,7 @@ public:
  * Hosts a gRPC server and supports registering arbitrary gRPC services and handlers.
  */
 UCLASS()
-class TEMPOSCRIPTING_API UTempoScriptingServer : public UObject, public FTickableGameObject
+class TEMPOSCRIPTING_API UTempoScriptingServer : public UObject
 {
 	GENERATED_BODY()
 public:
@@ -220,11 +228,7 @@ public:
 	virtual void Initialize(int32 Port);
 	virtual void Deinitialize();
 	
-	virtual bool IsTickable() const override { return bIsInitialized; }
-	virtual bool IsTickableWhenPaused() const override { return true; }
-	virtual bool IsTickableInEditor() const override { return true; }
-	virtual void Tick(float DeltaTime) override;
-	virtual TStatId GetStatId() const override { return GetStatID(); }
+	void Tick(float DeltaTime);
 	
 	template <class ServiceType, class... HandlerTypes>
 	void RegisterService(HandlerTypes... Handlers)

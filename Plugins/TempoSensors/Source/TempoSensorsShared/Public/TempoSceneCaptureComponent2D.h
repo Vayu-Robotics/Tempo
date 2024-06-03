@@ -18,6 +18,7 @@ struct TTextureRead
 	{
 		Image.SetNumUninitialized(ImageSize.X * ImageSize.Y);
 	}
+	
 
 	FIntPoint ImageSize;
 	int32 SequenceId;
@@ -36,6 +37,14 @@ struct TTextureReadQueue
 	void EnqueuePendingTextureRead(TTextureRead<PixelType>* TextureRead)
 	{
 		PendingTextureReads.Emplace(TextureRead);
+	}
+
+	void FlushPendingTextureReads() const
+	{
+		for (const auto& PendingTextureRead : PendingTextureReads)
+		{
+			PendingTextureRead->RenderFence.Wait();
+		}
 	}
 
 	TUniquePtr<TTextureRead<PixelType>> DequeuePendingTextureRead()
@@ -70,10 +79,12 @@ public:
 	virtual const TArray<TEnumAsByte<EMeasurementType>>& GetMeasurementTypes() const override { return MeasurementTypes; }
 	
 	virtual void UpdateSceneCaptureContents(FSceneInterface* Scene) override;
-
-	virtual void FlushMeasurementResponses() override {}
+	
+	virtual TOptional<TFuture<void>> FlushMeasurementResponses() override { return TOptional<TFuture<void>>(); }
 
 	virtual bool HasPendingRenderingCommands() override { return false; }
+
+	virtual void FlushPendingRenderingCommands() const override {}
 	
 protected:
 	virtual void BeginPlay() override;
@@ -102,7 +113,7 @@ protected:
 	int32 SequenceId = 0;
 	
 	void InitRenderTarget();
-	
+
 private:
 	void MaybeCapture();
 	
@@ -131,16 +142,8 @@ TTextureRead<PixelType>* UTempoSceneCaptureComponent2D::EnqueueTextureRead() con
 		{
 			void* OutBuffer;
 			int32 SurfaceWidth, SurfaceHeight;
-			const FIntPoint TextureSize = Context.RenderTarget->GetSizeXY();
 			RHICmdList.MapStagingSurface(Context.RenderTarget->GetRenderTargetTexture(), OutBuffer, SurfaceWidth, SurfaceHeight);
-			for (int32 Y = 0; Y < SurfaceHeight; ++Y)
-			{
-				for (int32 X = 0; X < TextureSize.X; ++X)
-				{
-					const int32 PixelOffset = X + (Y * SurfaceWidth);
-					(*Context.Image)[X + Y * TextureSize.X] = *(static_cast<PixelType*>(OutBuffer) + PixelOffset);
-				}
-			}
+			FMemory::Memcpy(Context.Image->GetData(), OutBuffer, SurfaceWidth * SurfaceHeight * sizeof(PixelType));
 			RHICmdList.UnmapStagingSurface(Context.RenderTarget->GetRenderTargetTexture());
 	});
 	

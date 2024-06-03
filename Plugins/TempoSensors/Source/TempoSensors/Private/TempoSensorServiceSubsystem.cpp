@@ -31,6 +31,45 @@ void UTempoSensorServiceSubsystem::RegisterWorldServices(UTempoScriptingServer* 
 		);
 }
 
+void UTempoSensorServiceSubsystem::Initialize(FSubsystemCollectionBase& Collection)
+{
+	Super::Initialize(Collection);
+
+	FWorldDelegates::OnWorldTickStart.AddUObject(this, &UTempoSensorServiceSubsystem::OnWorldTickStart);
+}
+
+void UTempoSensorServiceSubsystem::OnWorldTickStart(UWorld* World, ELevelTick TickType, float DeltaSeconds)
+{
+	if (World == GetWorld() && (World->WorldType == EWorldType::Game || World->WorldType == EWorldType::PIE))
+	{	
+		// In fixed step mode we block the game thread on any pending texture reads.
+		// This guarantees they will be sent out in the same frame when they were captured.
+		if (GetDefault<UTempoCoreSettings>()->GetTimeMode() == ETimeMode::FixedStep)
+		{
+			TRACE_CPUPROFILER_EVENT_SCOPE(TempoCameraReadTextures)
+			ForEachSensor([](const ITempoSensorInterface* Sensor)
+			{
+				Sensor->FlushPendingRenderingCommands();
+			});
+		}
+
+		TArray<TFuture<void>> Futures;
+		ForEachSensor([&Futures](ITempoSensorInterface* Sensor)
+		{
+			if (TOptional<TFuture<void>> Future = Sensor->FlushMeasurementResponses())
+			{
+				Futures.Add(MoveTemp(Future.GetValue()));
+			}
+		});
+		
+		TRACE_CPUPROFILER_EVENT_SCOPE(TempoCameraDecodeAndRespondGameThread)
+		for (const TFuture<void>& Future : Futures)
+		{
+			Future.Wait();
+		}
+	}
+}
+
 TempoSensors::MeasurementType ToProtoMeasurementType(EMeasurementType ImageType)
 {
 	switch (ImageType)
@@ -55,7 +94,7 @@ TempoSensors::MeasurementType ToProtoMeasurementType(EMeasurementType ImageType)
 	}
 }
 
-void UTempoSensorServiceSubsystem::ForEachSensor(const TFunction<bool(ITempoSensorInterface*)>& Callback) const
+void UTempoSensorServiceSubsystem::ForEachSensor(const TFunction<void(ITempoSensorInterface*)>& Callback) const
 {
 	check(GetWorld());
 	
@@ -66,10 +105,7 @@ void UTempoSensorServiceSubsystem::ForEachSensor(const TFunction<bool(ITempoSens
 		{
 			if (IsValid(Component) && Component->GetWorld() == GetWorld())
 			{
-				if (Callback(Sensor))
-				{
-					break;
-				}
+				Callback(Sensor);
 			}
 		}
 	}
@@ -89,7 +125,6 @@ void UTempoSensorServiceSubsystem::GetAvailableSensors(const TempoSensors::Avail
 		{
 			AvailableSensor->add_measurement_types(ToProtoMeasurementType(MeasurementType));
 		}
-		return false; // Don't break out of foreach
 	});
 
 	ResponseContinuation.ExecuteIfBound(Response, grpc::Status_OK);
@@ -188,27 +223,6 @@ void UTempoSensorServiceSubsystem::StreamLabelImages(const TempoCamera::LabelIma
 void UTempoSensorServiceSubsystem::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-
-	// In fixed step mode we block the game thread on any pending texture reads.
-	// This guarantees they will be sent out in the same frame when they were captured.
-	if (GetDefault<UTempoCoreSettings>()->GetTimeMode() == ETimeMode::FixedStep)
-	{
-		ForEachSensor([](ITempoSensorInterface* Sensor)
-		{
-			if (Sensor->HasPendingRenderingCommands())
-			{
-				FlushRenderingCommands();
-				return true; // Break out of foreach
-			}
-			return false; // Don't break out of foreach
-		});
-	}
-
-	ForEachSensor([](ITempoSensorInterface* Sensor)
-	{
-		Sensor->FlushMeasurementResponses();
-		return false; // Don't break out of foreach
-	});
 }
 
 TStatId UTempoSensorServiceSubsystem::GetStatId() const

@@ -39,6 +39,10 @@ class TEMPOSENSORS_API UTempoSensorServiceSubsystem : public UTickableWorldSubsy
 public:
 	virtual void RegisterWorldServices(UTempoScriptingServer* ScriptingServer) override;
 
+	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
+
+	virtual void OnWorldTickStart(UWorld* World, ELevelTick TickType, float DeltaSeconds);
+	
 	virtual void Tick(float DeltaTime) override;
 	virtual TStatId GetStatId() const override;
 	
@@ -51,7 +55,7 @@ private:
 
 	void StreamLabelImages(const TempoCamera::LabelImageRequest& Request, const TResponseDelegate<TempoCamera::LabelImage>& ResponseContinuation) const;
 
-	void ForEachSensor(const TFunction<bool(class ITempoSensorInterface*)>& Callback) const;
+	void ForEachSensor(const TFunction<void(class ITempoSensorInterface*)>& Callback) const;
 
 	template <typename RequestType, typename ResponseType>
 	void RequestImages(const RequestType& Request, const TResponseDelegate<ResponseType>& ResponseContinuation) const;

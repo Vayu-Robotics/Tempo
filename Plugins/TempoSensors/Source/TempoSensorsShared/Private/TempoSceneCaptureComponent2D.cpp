@@ -2,7 +2,7 @@
 
 #include "TempoSceneCaptureComponent2D.h"
 
-#include "TempoCoreSettings.h"
+#include "TempoSensorsSettings.h"
 
 #include "Engine/TextureRenderTarget2D.h"
 
@@ -49,35 +49,22 @@ void UTempoSceneCaptureComponent2D::MaybeCapture()
 		return;
 	}
 
-	if (GetDefault<UTempoCoreSettings>()->GetTimeMode() == ETimeMode::FixedStep)
-	{
-		// In fixed step mode we block the game thread to render the image immediately.
-		// It will then be read and sent before the end of the current frame.
-		CaptureScene();
-	}
-	else
-	{
-		// Otherwise, we render the frame along with the main render pass.
-		// It will get read and sent one or two frames after this one.
-		CaptureSceneDeferred();
-	}
+	CaptureSceneDeferred();
 }
 
 void UTempoSceneCaptureComponent2D::InitRenderTarget()
 {
-	UTextureRenderTarget2D* RenderTarget2D = NewObject<UTextureRenderTarget2D>(this);
+	TextureTarget = NewObject<UTextureRenderTarget2D>(this);
 	
-	RenderTarget2D->TargetGamma = GEngine->GetDisplayGamma();
-	RenderTarget2D->RenderTargetFormat = RenderTargetFormat;
-	RenderTarget2D->bGPUSharedFlag = true;
+	TextureTarget->TargetGamma = GetDefault<UTempoSensorsSettings>()->GetSceneCaptureGamma();
+	TextureTarget->RenderTargetFormat = RenderTargetFormat;
+	TextureTarget->bGPUSharedFlag = true;
 	if (PixelFormatOverride == EPixelFormat::PF_Unknown)
 	{
-		RenderTarget2D->InitAutoFormat(SizeXY.X, SizeXY.Y);
+		TextureTarget->InitAutoFormat(SizeXY.X, SizeXY.Y);
 	}
 	else
 	{
-		RenderTarget2D->InitCustomFormat(SizeXY.X, SizeXY.Y, PixelFormatOverride, true);
+		TextureTarget->InitCustomFormat(SizeXY.X, SizeXY.Y, PixelFormatOverride, true);
 	}
-	
-	TextureTarget = RenderTarget2D;
 }
