@@ -114,15 +114,14 @@ void UTempoScriptingServer::Tick(float DeltaTime)
 	const int32 MaxEventProcessingTimeMicroSeconds = Settings->GetMaxEventProcessingTime();
 	const double MaxEventProcessingTimeSeconds = MaxEventProcessingTimeMicroSeconds / 1.e6;
 	const int32 MaxEventWaitTimeNanoSeconds = Settings->GetMaxEventWaitTime();
+	const int32 MaxMessageWriteTimeMilliSeconds = Settings->GetMaxMessageWriteTime();
 
 	TSet<int32> ManagersWithPendingWrites;
 	for (const auto& Elem : RequestManagers)
 	{
 		const int32 Tag = Elem.Key;
 		const TSharedPtr<FRequestManager>& RequestManager = Elem.Value;
-		const FRequestManager::EState State = RequestManager->GetState();
-		if (State == FRequestManager::EState::RESPONDING ||
-			State == FRequestManager::EState::FINISHING)
+		if (RequestManager->GetWriteBeganTime().IsSet())
 		{
 			ManagersWithPendingWrites.Add(Tag);
 		}
@@ -157,6 +156,27 @@ void UTempoScriptingServer::Tick(float DeltaTime)
 			}
 		case grpc::CompletionQueue::TIMEOUT:
 			{
+				// We reached MaxEventWaitTime without getting any more events.
+				for (auto ManagersWithPendingWriteIt = ManagersWithPendingWrites.CreateIterator(); ManagersWithPendingWriteIt; ++ManagersWithPendingWriteIt)
+				{
+					if (TSharedPtr<FRequestManager>* RequestManagerPtr = RequestManagers.Find(*ManagersWithPendingWriteIt))
+					{
+						TSharedPtr<FRequestManager> RequestManager = *RequestManagerPtr;
+						if (!RequestManager->GetWriteBeganTime().IsSet())
+						{
+							UE_LOG(LogTempoScripting, Error, TEXT("WriteBeganTime was not set but it should have been"));
+							continue;
+						}
+						if (FPlatformTime::Seconds() - RequestManager->GetWriteBeganTime().GetValue() > MaxMessageWriteTimeMilliSeconds / 1000.0)
+						{
+							// Assume the client has disconnected, expire this request.
+							UE_LOG(LogTempoScripting, Display, TEXT("Request timeout - assuming client disconnected and expiring."))
+							ManagersWithPendingWriteIt.RemoveCurrent();
+							RequestManagers.Remove(*ManagersWithPendingWriteIt);
+						}
+					}
+				}
+
 				// If we've processed all the pending events (which, in fixed time mode, includes an event for every manager with a pending write), move on.
 				bProcessedPendingEvents = TimeMode == ETimeMode::FixedStep ? ManagersWithPendingWrites.IsEmpty() : true;
 				break;
@@ -174,6 +194,8 @@ void UTempoScriptingServer::HandleEventForTag(int32 Tag, bool bOk)
 			RequestManagers.Remove(Tag);
 			return;
 		}
+
+		(*RequestManager)->WriteComplete();
 		
 		switch ((*RequestManager)->GetState())
 		{

@@ -30,6 +30,7 @@ public:
 	EScriptingCompressionLevel GetScriptingCompressionLevel() const { return ScriptingCompressionLevel; }
 	int32 GetMaxEventProcessingTime() const { return MaxEventProcessingTimeMicroSeconds; }
 	int32 GetMaxEventWaitTime() const { return MaxEventWaitTimeNanoSeconds; }
+	int32 GetMaxMessageWriteTime() const { return MaxMessageWriteTime; }
 
 #if WITH_EDITOR
 	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
@@ -64,4 +65,9 @@ private:
 	// We will wait as much as this amount of time (in nanoseconds) for an event to arrive each time we check for an event.
 	UPROPERTY(EditAnywhere, Config, Category="Scripting|Advanced", meta=(ClampMin=1, ClampMax=10000, UIMin=1, UIMax=10000))
 	int32 MaxEventWaitTimeNanoSeconds = 1000;
+
+	// We will wait as much as this amount of time (in milliseconds) for a message to write. After that, we will give up on it
+	// (and assume its client disconnected).
+	UPROPERTY(EditAnywhere, Config, Category="Scripting|Advanced", meta=(ClampMin=1, ClampMax=10000, UIMin=1, UIMax=10000))
+	int32 MaxMessageWriteTime = 100;
 };

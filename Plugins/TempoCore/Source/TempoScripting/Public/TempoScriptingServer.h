@@ -113,6 +113,8 @@ struct FRequestManager : TSharedFromThis<FRequestManager>
 	virtual void Init(grpc::ServerCompletionQueue* CompletionQueue) = 0;
 	virtual void HandleAndRespond() = 0;
 	virtual FRequestManager* Duplicate(int32 NewTag) const = 0;
+	virtual const TOptional<double>& GetWriteBeganTime() const = 0;
+	virtual void WriteComplete() = 0;
 };
 
 template <class HandlerType>
@@ -130,6 +132,10 @@ public:
 		State = REQUESTED;
 	}
 
+	virtual const TOptional<double>& GetWriteBeganTime() const override { return WriteBeganTime; }
+
+	virtual void WriteComplete() override { WriteBeganTime.Reset(); }
+
 protected:
 	EState State;
 	int32 Tag;
@@ -139,6 +145,7 @@ protected:
 	grpc::ServerContext Context;
 	typename HandlerType::HandlerResponderType Responder;
 	TResponseDelegate<typename HandlerType::HandlerResponseType> ResponseDelegate;
+	TOptional<double> WriteBeganTime;
 };
 
 template <class HandlerType>
@@ -161,6 +168,7 @@ public:
 		Base::ResponseDelegate = TResponseDelegate<ResponseType>::CreateSPLambda(static_cast<FRequestManager*>(this), [this](const ResponseType& Response, grpc::Status Result)
 		{
 			Base::State = FRequestManager::EState::FINISHING;
+			Base::WriteBeganTime = FPlatformTime::Seconds();
 			Base::Responder.Finish(Response, Result, &(Base::Tag));
 		});
 		Base::Handler->HandleRequest(Base::Request, Base::ResponseDelegate);
@@ -189,12 +197,16 @@ public:
 			{
 				// Consider non-OK result to mean there are no more responses available.
 				Base::Responder.Finish(Result, &(Base::Tag));
+				Base::WriteBeganTime = FPlatformTime::Seconds();
 				Base::State = FRequestManager::EState::FINISHING;
 				return;
 			}
 
 			Base::State = FRequestManager::EState::RESPONDING;
-			Base::Responder.Write(Response, &(Base::Tag));
+			Base::WriteBeganTime = FPlatformTime::Seconds();
+			grpc::WriteOptions WriteOptions;
+			WriteOptions.set_write_through();
+			Base::Responder.Write(Response, WriteOptions, &(Base::Tag));
 		});
 		Base::Handler->HandleRequest(Base::Request, Base::ResponseDelegate);
 	}
