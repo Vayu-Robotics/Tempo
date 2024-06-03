@@ -133,14 +133,7 @@ TTextureRead<PixelType>* UTempoSceneCaptureComponent2D::EnqueueTextureRead() con
 			int32 SurfaceWidth, SurfaceHeight;
 			const FIntPoint TextureSize = Context.RenderTarget->GetSizeXY();
 			RHICmdList.MapStagingSurface(Context.RenderTarget->GetRenderTargetTexture(), OutBuffer, SurfaceWidth, SurfaceHeight);
-			for (int32 Y = 0; Y < SurfaceHeight; ++Y)
-			{
-				for (int32 X = 0; X < TextureSize.X; ++X)
-				{
-					const int32 PixelOffset = X + (Y * SurfaceWidth);
-					(*Context.Image)[X + Y * TextureSize.X] = *(static_cast<PixelType*>(OutBuffer) + PixelOffset);
-				}
-			}
+			FMemory::Memcpy(Context.Image->GetData(), OutBuffer, SurfaceWidth * SurfaceHeight * sizeof(PixelType));
 			RHICmdList.UnmapStagingSurface(Context.RenderTarget->GetRenderTargetTexture());
 	});
 	
