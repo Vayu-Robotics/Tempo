@@ -54,19 +54,17 @@ void UTempoSceneCaptureComponent2D::MaybeCapture()
 
 void UTempoSceneCaptureComponent2D::InitRenderTarget()
 {
-	UTextureRenderTarget2D* RenderTarget2D = NewObject<UTextureRenderTarget2D>(this);
+	TextureTarget = NewObject<UTextureRenderTarget2D>(this);
 	
-	RenderTarget2D->TargetGamma = GetDefault<UTempoSensorsSettings>()->GetSceneCaptureGamma();
-	RenderTarget2D->RenderTargetFormat = RenderTargetFormat;
-	RenderTarget2D->bGPUSharedFlag = true;
+	TextureTarget->TargetGamma = GetDefault<UTempoSensorsSettings>()->GetSceneCaptureGamma();
+	TextureTarget->RenderTargetFormat = RenderTargetFormat;
+	TextureTarget->bGPUSharedFlag = true;
 	if (PixelFormatOverride == EPixelFormat::PF_Unknown)
 	{
-		RenderTarget2D->InitAutoFormat(SizeXY.X, SizeXY.Y);
+		TextureTarget->InitAutoFormat(SizeXY.X, SizeXY.Y);
 	}
 	else
 	{
-		RenderTarget2D->InitCustomFormat(SizeXY.X, SizeXY.Y, PixelFormatOverride, true);
+		TextureTarget->InitCustomFormat(SizeXY.X, SizeXY.Y, PixelFormatOverride, true);
 	}
-	
-	TextureTarget = RenderTarget2D;
 }
