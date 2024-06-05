@@ -26,8 +26,8 @@ namespace UnrealBuildTool
     //    all the libraries (deduplicated, with many exceptions, its complicated) and explicitly export them all.s
     class TempoVCToolChain : VCToolChain
     {
-        public TempoVCToolChain(ReadOnlyTargetRules Target)
-            : base(Target, Log.Logger)
+        public TempoVCToolChain(ReadOnlyTargetRules Target, ILogger Logger)
+            : base(Target, Logger)
         {
             
         }
