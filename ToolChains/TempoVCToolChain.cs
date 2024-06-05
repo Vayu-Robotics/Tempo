@@ -6,6 +6,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using EpicGames.Core;
+using Microsoft.Extensions.Logging;
 using UnrealBuildBase;
 
 namespace UnrealBuildTool
