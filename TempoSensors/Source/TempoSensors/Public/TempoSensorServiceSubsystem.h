@@ -43,7 +43,6 @@ public:
 
 	virtual void OnWorldTickStart(UWorld* World, ELevelTick TickType, float DeltaSeconds);
 	
-private:
 	void GetAvailableSensors(const TempoSensors::AvailableSensorsRequest& Request, const TResponseDelegate<TempoSensors::AvailableSensorsResponse>& ResponseContinuation) const;
 
 	void StreamColorImages(const TempoCamera::ColorImageRequest& Request, const TResponseDelegate<TempoCamera::ColorImage>& ResponseContinuation) const;
