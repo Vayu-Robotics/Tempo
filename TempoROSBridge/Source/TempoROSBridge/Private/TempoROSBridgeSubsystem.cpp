@@ -7,6 +7,9 @@
 #include "TempoSensorServiceSubsystem.h"
 #include "TempoSensors/Sensors.grpc.pb.h"
 
+#include "tempo_ros_bridge/msg/test_one.hpp"
+#include "tempo_ros_bridge/srv/test_service.hpp"
+
 void UTempoROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
@@ -16,6 +19,9 @@ void UTempoROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 
+	tempo_ros_bridge::msg::TestOne test;
+	tempo_ros_bridge::srv::TestService test_service;
+
 	ROSNode = NewObject<UTempoROSNode>(this);
 
 	InWorld.GetTimerManager().SetTimer(UpdatePublicationsTimerHandle, this, &UTempoROSBridgeSubsystem::UpdatePublications, UpdatePublicationsPeriod, true);
@@ -24,7 +30,7 @@ void UTempoROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Received %s"), *Message);
 	}));
-	PlayPauseService = ROSNode->AddService<TempoEmptyService>("PlayPause", TROSServiceDelegate<TempoEmptyService>::CreateLambda([](const TempoScripting::Empty& Request)
+	ROSNode->AddService<TempoEmptyService>("PlayPause", TROSServiceDelegate<TempoEmptyService>::CreateLambda([](const TempoScripting::Empty& Request)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Play/Pause"));
 		return TempoScripting::Empty();
