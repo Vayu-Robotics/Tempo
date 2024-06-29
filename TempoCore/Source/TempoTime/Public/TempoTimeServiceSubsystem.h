@@ -8,6 +8,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "TempoScripting/Empty.pb.h"
 
 #include "TempoTimeServiceSubsystem.generated.h"
 
@@ -31,7 +32,7 @@ class TEMPOTIME_API UTempoTimeServiceSubsystem : public UWorldSubsystem, public 
 public:
 	virtual void RegisterWorldServices(UTempoScriptingServer* ScriptingServer) override;
 
-private:
+protected:
 	void SetTimeMode(const TempoTime::TimeModeRequest& Request, const TResponseDelegate<TempoScripting::Empty>& ResponseContinuation) const;
 
 	void SetSimStepsPerSecond(const TempoTime::SetSimStepsPerSecondRequest& Request, const TResponseDelegate<TempoScripting::Empty>& ResponseContinuation) const;
