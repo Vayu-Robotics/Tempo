@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "Modules/ModuleManager.h"
 
-class FTempoScriptingROSBridgeModule : public IModuleInterface
+class FTempoGeographicROSBridgeModule : public IModuleInterface
 {
 public:
     virtual void StartupModule() override;

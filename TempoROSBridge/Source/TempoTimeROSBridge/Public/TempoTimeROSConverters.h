@@ -10,10 +10,6 @@
 
 #include "TempoTime/Time.grpc.pb.h"
 
-DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(TempoTime::AdvanceStepsRequest)
-DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(TempoTime::SetSimStepsPerSecondRequest)
-DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(TempoTime::TimeModeRequest)
-
 template <>
 struct TFromROSConverter<TempoTime::AdvanceStepsRequest> : TConverter<TFromROSConverter<TempoTime::AdvanceStepsRequest>>
 {

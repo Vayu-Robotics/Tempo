@@ -31,7 +31,7 @@ class TEMPOGEOGRAPHIC_API UTempoGeographicServiceSubsystem : public UWorldSubsys
 public:
 	virtual void RegisterWorldServices(UTempoScriptingServer* ScriptingServer) override;
 
-private:
+protected:
 	void SetDate(const TempoGeographic::Date& Request, const TResponseDelegate<TempoScripting::Empty>& ResponseContinuation);
 
 	void SetTimeOfDay(const TempoGeographic::TimeOfDay& Request, const TResponseDelegate<TempoScripting::Empty>& ResponseContinuation);

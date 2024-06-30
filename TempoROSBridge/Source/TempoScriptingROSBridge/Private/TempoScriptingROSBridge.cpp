@@ -1,4 +1,6 @@
-﻿#include "TempoScriptingROSBridge.h"
+﻿// Copyright Tempo Simulation, LLC. All Rights Reserved
+
+#include "TempoScriptingROSBridge.h"
 
 #define LOCTEXT_NAMESPACE "FTempoScriptingROSBridgeModule"
 

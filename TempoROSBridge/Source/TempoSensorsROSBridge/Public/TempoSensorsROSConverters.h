@@ -10,6 +10,10 @@
 #include "TempoSensors/Sensors.grpc.pb.h"
 #include "TempoCamera/Camera.pb.h"
 
+DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(TempoCamera::ColorImage);
+DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(TempoCamera::DepthImage);
+DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(TempoCamera::LabelImage);
+
 template <>
 struct TFromROSConverter<TempoSensors::AvailableSensorsRequest>: TConverter<TFromROSConverter<TempoSensors::AvailableSensorsRequest>>
 {
