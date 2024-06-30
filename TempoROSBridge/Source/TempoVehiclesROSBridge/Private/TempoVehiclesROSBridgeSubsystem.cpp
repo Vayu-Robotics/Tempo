@@ -15,7 +15,7 @@ void UTempoVehiclesROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 
-	ROSNode = NewObject<UTempoROSNode>(this);
+	ROSNode = UTempoROSNode::Create("TempoVehicles", this, &InWorld);
 
 	ROSNode->AddService<FTempoGetCommandableVehiclesService>(
 		"GetCommandableVehicles",

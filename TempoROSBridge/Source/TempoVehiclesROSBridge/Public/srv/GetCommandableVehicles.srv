@@ -1,2 +1,2 @@
 ---
-string vehicle_names
+string[] vehicle_names

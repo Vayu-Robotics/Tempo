@@ -16,10 +16,17 @@ public class TempoSensorsROSBridge : ModuleRules
         PrivateDependencyModuleNames.AddRange(
             new string[]
             {
+                // Unreal
                 "CoreUObject",
                 "Engine",
                 "Slate",
-                "SlateCore"
+                "SlateCore",
+                // Tempo
+                "TempoCamera",
+                "TempoSensors",
+                "TempoScripting",
+                "TempoROS",
+                "rclcpp"
             }
         );
     }

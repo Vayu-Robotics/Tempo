@@ -10,18 +10,6 @@
 #include "TempoVehicles/Driving.grpc.pb.h"
 
 template <>
-struct TFromROSConverter<TempoScripting::Empty> : TConverter<TFromROSConverter<TempoScripting::Empty>>
-{
-	using ToType = TempoScripting::Empty;
-	using FromType = tempo_vehicles_ros_bridge::srv::GetCommandableVehicles::Request;
-	static ToType Convert(const FromType& ROSValue)
-	{
-		return ToType();
-	}
-};
-
-
-template <>
 struct TToROSConverter<TempoVehicles::CommandableVehiclesResponse> : TConverter<TFromROSConverter<TempoVehicles::CommandableVehiclesResponse>>
 {
 	using ToType = tempo_vehicles_ros_bridge::srv::GetCommandableVehicles::Response;
@@ -31,7 +19,7 @@ struct TToROSConverter<TempoVehicles::CommandableVehiclesResponse> : TConverter<
 		ToType ROSValue;
 		for (const std::string& vehicle_name : TempoValue.vehicle_name())
 		{
-			ROSValue.vehicle_names.append(vehicle_name);
+			ROSValue.vehicle_names.push_back(vehicle_name);
 		}
 		return ROSValue;
 	}

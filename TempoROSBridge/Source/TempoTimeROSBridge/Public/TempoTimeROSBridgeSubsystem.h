@@ -13,7 +13,7 @@ class TEMPOTIMEROSBRIDGE_API UTempoTimeROSBridgeSubsystem : public UTempoTimeSer
 public:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 
-private:
+protected:
 	UPROPERTY()
 	class UTempoROSNode* ROSNode;
 };

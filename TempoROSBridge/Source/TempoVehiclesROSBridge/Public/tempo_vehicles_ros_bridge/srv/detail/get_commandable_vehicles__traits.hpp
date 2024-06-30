@@ -108,8 +108,19 @@ inline void to_flow_style_yaml(
   out << "{";
   // member: vehicle_names
   {
-    out << "vehicle_names: ";
-    rosidl_generator_traits::value_to_yaml(msg.vehicle_names, out);
+    if (msg.vehicle_names.size() == 0) {
+      out << "vehicle_names: []";
+    } else {
+      out << "vehicle_names: [";
+      size_t pending_items = msg.vehicle_names.size();
+      for (auto item : msg.vehicle_names) {
+        rosidl_generator_traits::value_to_yaml(item, out);
+        if (--pending_items > 0) {
+          out << ", ";
+        }
+      }
+      out << "]";
+    }
   }
   out << "}";
 }  // NOLINT(readability/fn_size)
@@ -123,9 +134,19 @@ inline void to_block_style_yaml(
     if (indentation > 0) {
       out << std::string(indentation, ' ');
     }
-    out << "vehicle_names: ";
-    rosidl_generator_traits::value_to_yaml(msg.vehicle_names, out);
-    out << "\n";
+    if (msg.vehicle_names.size() == 0) {
+      out << "vehicle_names: []\n";
+    } else {
+      out << "vehicle_names:\n";
+      for (auto item : msg.vehicle_names) {
+        if (indentation > 0) {
+          out << std::string(indentation, ' ');
+        }
+        out << "- ";
+        rosidl_generator_traits::value_to_yaml(item, out);
+        out << "\n";
+      }
+    }
   }
 }  // NOLINT(readability/fn_size)
 

@@ -142,31 +142,23 @@ struct GetCommandableVehicles_Response_
 
   explicit GetCommandableVehicles_Response_(rosidl_runtime_cpp::MessageInitialization _init = rosidl_runtime_cpp::MessageInitialization::ALL)
   {
-    if (rosidl_runtime_cpp::MessageInitialization::ALL == _init ||
-      rosidl_runtime_cpp::MessageInitialization::ZERO == _init)
-    {
-      this->vehicle_names = "";
-    }
+    (void)_init;
   }
 
   explicit GetCommandableVehicles_Response_(const ContainerAllocator & _alloc, rosidl_runtime_cpp::MessageInitialization _init = rosidl_runtime_cpp::MessageInitialization::ALL)
-  : vehicle_names(_alloc)
   {
-    if (rosidl_runtime_cpp::MessageInitialization::ALL == _init ||
-      rosidl_runtime_cpp::MessageInitialization::ZERO == _init)
-    {
-      this->vehicle_names = "";
-    }
+    (void)_init;
+    (void)_alloc;
   }
 
   // field types and members
   using _vehicle_names_type =
-    std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char>>;
+    std::vector<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char>>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char>>>>;
   _vehicle_names_type vehicle_names;
 
   // setters for named parameter idiom
   Type & set__vehicle_names(
-    const std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char>> & _arg)
+    const std::vector<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char>>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<std::basic_string<char, std::char_traits<char>, typename std::allocator_traits<ContainerAllocator>::template rebind_alloc<char>>>> & _arg)
   {
     this->vehicle_names = _arg;
     return *this;

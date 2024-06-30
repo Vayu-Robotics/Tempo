@@ -13,7 +13,7 @@ class TEMPOVEHICLESROSBRIDGE_API UTempoVehiclesROSBridgeSubsystem : public UTemp
 public:
 	virtual void OnWorldBeginPlay(UWorld& InWorld) override;
 
-private:
+protected:
 	UPROPERTY()
 	class UTempoROSNode* ROSNode;
 };

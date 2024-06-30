@@ -16,7 +16,7 @@ void UTempoTimeROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 
-	ROSNode = NewObject<UTempoROSNode>(this);
+	ROSNode = UTempoROSNode::Create("TempoTime", this, &InWorld);
 
 	ROSNode->AddService<FTempoAdvanceStepsService>("AdvanceSteps", TROSServiceDelegate<FTempoAdvanceStepsService>::CreateLambda([this](const FTempoAdvanceStepsService::Request& Request)
 	{
