@@ -27,6 +27,7 @@ public class TempoTimeROSBridge : ModuleRules
                 "TempoScripting",
                 "TempoROS",
                 "rclcpp",
+                "TempoROSBridgeShared",
             }
         );
     }

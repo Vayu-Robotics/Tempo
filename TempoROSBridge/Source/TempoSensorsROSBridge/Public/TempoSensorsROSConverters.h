@@ -15,25 +15,20 @@ DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(TempoCamera::DepthImage);
 DEFINE_TEMPOROS_MESSAGE_TYPE_TRAITS(TempoCamera::LabelImage);
 
 template <>
-struct TFromROSConverter<TempoSensors::AvailableSensorsRequest>: TConverter<TFromROSConverter<TempoSensors::AvailableSensorsRequest>>
+struct TFromROSConverter<tempo_sensors_ros_bridge::srv::GetAvailableSensors::Request, TempoSensors::AvailableSensorsRequest>
 {
-	using ToType = TempoSensors::AvailableSensorsRequest;
-	using FromType = tempo_sensors_ros_bridge::srv::GetAvailableSensors::Request;
-	static ToType Convert(const FromType& ROSValue)
+	static TempoSensors::AvailableSensorsRequest Convert(const tempo_sensors_ros_bridge::srv::GetAvailableSensors::Request& ROSValue)
 	{
-		const ToType TempoValue;
-		return TempoValue;
+		return TempoSensors::AvailableSensorsRequest();
 	}
 };
 
 template <>
-struct TToROSConverter<TempoSensors::AvailableSensorsResponse>: TConverter<TToROSConverter<TempoSensors::AvailableSensorsResponse>>
+struct TToROSConverter<tempo_sensors_ros_bridge::srv::GetAvailableSensors::Response, TempoSensors::AvailableSensorsResponse>
 {
-	using ToType = tempo_sensors_ros_bridge::srv::GetAvailableSensors::Response;
-	using FromType = TempoSensors::AvailableSensorsResponse;
-	static ToType Convert(const FromType& TempoValue)
+	static tempo_sensors_ros_bridge::srv::GetAvailableSensors::Response Convert(const TempoSensors::AvailableSensorsResponse& TempoValue)
 	{
-		ToType ROSType;
+		tempo_sensors_ros_bridge::srv::GetAvailableSensors::Response ROSType;
 		ROSType.available_sensors.resize(TempoValue.available_sensors().size());
 		for (const auto& TempoAvailableSensor : TempoValue.available_sensors())
 		{
@@ -79,17 +74,15 @@ struct FTempoGetAvailableSensors
 };
 
 template <>
-struct TToROSConverter<FTempoGetAvailableSensors>: TConverter<TToROSConverter<FTempoGetAvailableSensors>>
+struct TImplicitToROSConverter<FTempoGetAvailableSensors>
 {
 	using ToType = tempo_sensors_ros_bridge::srv::GetAvailableSensors;
 	using FromType = FTempoGetAvailableSensors;
 };
 
 template <>
-struct TToROSConverter<TempoCamera::ColorImage>: TConverter<TToROSConverter<TempoCamera::ColorImage>>
+struct TImplicitToROSConverter<TempoCamera::ColorImage>: TToROSConverter<sensor_msgs::msg::Image, TempoCamera::ColorImage>
 {
-	using ToType = sensor_msgs::msg::Image;
-	using FromType = TempoCamera::ColorImage;
 	static ToType Convert(const FromType& TempoValue)
 	{
 		ToType ToValue;
@@ -102,10 +95,8 @@ struct TToROSConverter<TempoCamera::ColorImage>: TConverter<TToROSConverter<Temp
 };
 
 template <>
-struct TToROSConverter<TempoCamera::DepthImage>: TConverter<TToROSConverter<TempoCamera::DepthImage>>
+struct TImplicitToROSConverter<TempoCamera::DepthImage>: TToROSConverter<sensor_msgs::msg::Image, TempoCamera::DepthImage>
 {
-	using ToType = sensor_msgs::msg::Image;
-	using FromType = TempoCamera::DepthImage;
 	static ToType Convert(const FromType& TempoValue)
 	{
 		ToType ToValue;
@@ -118,10 +109,8 @@ struct TToROSConverter<TempoCamera::DepthImage>: TConverter<TToROSConverter<Temp
 };
 
 template <>
-struct TToROSConverter<TempoCamera::LabelImage>: TConverter<TToROSConverter<TempoCamera::LabelImage>>
+struct TImplicitToROSConverter<TempoCamera::LabelImage>: TToROSConverter<sensor_msgs::msg::Image, TempoCamera::LabelImage>
 {
-	using ToType = sensor_msgs::msg::Image;
-	using FromType = TempoCamera::LabelImage;
 	static ToType Convert(const FromType& TempoValue)
 	{
 		ToType ToValue;

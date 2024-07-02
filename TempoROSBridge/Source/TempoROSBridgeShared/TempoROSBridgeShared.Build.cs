@@ -1,15 +1,18 @@
 ﻿using UnrealBuildTool;
 
-public class TempoSensorsROSBridge : ModuleRules
+public class TempoROSBridgeShared : ModuleRules
 {
-    public TempoSensorsROSBridge(ReadOnlyTargetRules Target) : base(Target)
+    public TempoROSBridgeShared(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
         PublicDependencyModuleNames.AddRange(
             new string[]
             {
+                // Unreal
                 "Core",
+                // Tempo
+                "TempoScripting",
             }
         );
 
@@ -22,12 +25,7 @@ public class TempoSensorsROSBridge : ModuleRules
                 "Slate",
                 "SlateCore",
                 // Tempo
-                "TempoCamera",
-                "TempoSensors",
-                "TempoScripting",
                 "TempoROS",
-                "rclcpp",
-                "TempoROSBridgeShared",
             }
         );
     }

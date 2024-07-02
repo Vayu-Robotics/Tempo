@@ -26,8 +26,10 @@ public class TempoGeographicROSBridge : ModuleRules
                 // Tempo
                 "TempoGeographic",
                 "TempoScripting",
+                "TempoScriptingROSBridge",
                 "TempoROS",
                 "rclcpp",
+                "TempoROSBridgeShared",
             }
         );
     }

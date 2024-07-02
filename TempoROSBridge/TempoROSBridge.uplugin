@@ -43,6 +43,11 @@
 			"Name": "TempoGeographicROSBridge",
 			"Type": "Runtime",
 			"LoadingPhase": "Default"
+		},
+		{
+			"Name": "TempoROSBridgeShared",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
 		}
 	],
 	"Plugins": [

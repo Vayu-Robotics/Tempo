@@ -10,13 +10,11 @@
 #include "TempoVehicles/Driving.grpc.pb.h"
 
 template <>
-struct TToROSConverter<TempoVehicles::CommandableVehiclesResponse> : TConverter<TFromROSConverter<TempoVehicles::CommandableVehiclesResponse>>
+struct TToROSConverter<tempo_vehicles_ros_bridge::srv::GetCommandableVehicles::Response, TempoVehicles::CommandableVehiclesResponse>
 {
-	using ToType = tempo_vehicles_ros_bridge::srv::GetCommandableVehicles::Response;
-	using FromType = TempoVehicles::CommandableVehiclesResponse;
-	static ToType Convert(const FromType& TempoValue)
+	static tempo_vehicles_ros_bridge::srv::GetCommandableVehicles::Response Convert(const TempoVehicles::CommandableVehiclesResponse& TempoValue)
 	{
-		ToType ROSValue;
+		tempo_vehicles_ros_bridge::srv::GetCommandableVehicles::Response ROSValue;
 		for (const std::string& vehicle_name : TempoValue.vehicle_name())
 		{
 			ROSValue.vehicle_names.push_back(vehicle_name);
@@ -26,13 +24,20 @@ struct TToROSConverter<TempoVehicles::CommandableVehiclesResponse> : TConverter<
 };
 
 template <>
-struct TFromROSConverter<TempoVehicles::DrivingCommandRequest> : TConverter<TFromROSConverter<TempoVehicles::DrivingCommandRequest>>
+struct TFromROSConverter<tempo_vehicles_ros_bridge::srv::GetCommandableVehicles::Request, TempoScripting::Empty>
 {
-	using ToType = TempoVehicles::DrivingCommandRequest;
-	using FromType = tempo_vehicles_ros_bridge::srv::CommandVehicle::Request;
-	static ToType Convert(const FromType& ROSValue)
+	static TempoScripting::Empty Convert(const tempo_vehicles_ros_bridge::srv::GetCommandableVehicles::Request& ROSValue)
 	{
-		ToType TempoValue;
+		return TempoScripting::Empty();
+	}
+};
+
+template <>
+struct TFromROSConverter<tempo_vehicles_ros_bridge::srv::CommandVehicle::Request, TempoVehicles::DrivingCommandRequest>
+{
+	static TempoVehicles::DrivingCommandRequest Convert(const tempo_vehicles_ros_bridge::srv::CommandVehicle::Request& ROSValue)
+	{
+		TempoVehicles::DrivingCommandRequest TempoValue;
 		TempoValue.set_vehicle_name(ROSValue.vehicle_name);
 		TempoValue.set_acceleration(ROSValue.acceleration);
 		TempoValue.set_steering(ROSValue.steering);
@@ -40,14 +45,23 @@ struct TFromROSConverter<TempoVehicles::DrivingCommandRequest> : TConverter<TFro
 	}
 };
 
+template <>
+struct TToROSConverter<tempo_vehicles_ros_bridge::srv::CommandVehicle::Response, TempoScripting::Empty>
+{
+	static tempo_vehicles_ros_bridge::srv::CommandVehicle::Response Convert(const TempoScripting::Empty& TempoValue)
+	{
+		return tempo_vehicles_ros_bridge::srv::CommandVehicle::Response();
+	}
+};
+
 struct FTempoGetCommandableVehiclesService
 {
-	using Request = tempo_vehicles_ros_bridge::srv::GetCommandableVehicles::Request;
+	using Request = TempoScripting::Empty;
 	using Response = TempoVehicles::CommandableVehiclesResponse;
 };
 
 template <>
-struct TToROSConverter<FTempoGetCommandableVehiclesService>
+struct TImplicitToROSConverter<FTempoGetCommandableVehiclesService>
 {
 	using FromType = FTempoGetCommandableVehiclesService;
 	using ToType = tempo_vehicles_ros_bridge::srv::GetCommandableVehicles;
@@ -56,11 +70,11 @@ struct TToROSConverter<FTempoGetCommandableVehiclesService>
 struct FTempoCommandVehicleService
 {
 	using Request = TempoVehicles::DrivingCommandRequest;
-	using Response = tempo_vehicles_ros_bridge::srv::CommandVehicle::Response;
+	using Response = TempoScripting::Empty;
 };
 
 template <>
-struct TToROSConverter<FTempoCommandVehicleService>
+struct TImplicitToROSConverter<FTempoCommandVehicleService>
 {
 	using FromType = FTempoCommandVehicleService;
 	using ToType = tempo_vehicles_ros_bridge::srv::CommandVehicle;

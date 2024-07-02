@@ -9,24 +9,20 @@
 #include "TempoScripting/Empty.pb.h"
 
 template <>
-struct TToROSConverter<TempoScripting::Empty> : TConverter<TToROSConverter<TempoScripting::Empty>>
+struct TToROSConverter<std_srvs::srv::Empty::Response, TempoScripting::Empty>
 {
-	using ToType = std_srvs::srv::Empty::Response;
-	using FromType = TempoScripting::Empty;
-	static ToType Convert(const FromType& TempoValue)
+	static std_srvs::srv::Empty::Response Convert(const TempoScripting::Empty& TempoValue)
 	{
-		return ToType();
+		return std_srvs::srv::Empty::Response();
 	}
 };
 
 template <>
-struct TFromROSConverter<TempoScripting::Empty> : TConverter<TFromROSConverter<TempoScripting::Empty>>
+struct TFromROSConverter<std_srvs::srv::Empty::Request, TempoScripting::Empty>
 {
-	using ToType = TempoScripting::Empty;
-	using FromType = std_srvs::srv::Empty::Request;
-	static ToType Convert(const FromType& ROSValue)
+	static TempoScripting::Empty Convert(const std_srvs::srv::Empty::Request& TempoValue)
 	{
-		return ToType();
+		return TempoScripting::Empty();
 	}
 };
 
@@ -37,7 +33,7 @@ struct FTempoEmptyService
 };
 
 template <>
-struct TToROSConverter<FTempoEmptyService>
+struct TImplicitToROSConverter<FTempoEmptyService>
 {
 	using FromType = FTempoEmptyService;
 	using ToType = std_srvs::srv::Empty;

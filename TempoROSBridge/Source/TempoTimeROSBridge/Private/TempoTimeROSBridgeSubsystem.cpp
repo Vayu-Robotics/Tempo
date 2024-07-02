@@ -3,9 +3,12 @@
 #include "TempoTimeROSBridgeSubsystem.h"
 
 #include "TempoTimeROSConverters.h"
-#include "TempoScriptingROSConverters.h"
 
 #include "TempoROSNode.h"
+
+#include "TempoROSBridgeUtils.h"
+
+#include "TempoScriptingROSConverters.h"
 
 void UTempoTimeROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
@@ -17,70 +20,10 @@ void UTempoTimeROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 
 	ROSNode = UTempoROSNode::Create("TempoTime", this, &InWorld);
-
-	ROSNode->AddService<FTempoAdvanceStepsService>("AdvanceSteps", TROSServiceDelegate<FTempoAdvanceStepsService>::CreateLambda([this](const FTempoAdvanceStepsService::Request& Request)
-	{
-		TOptional<FTempoAdvanceStepsService::Response> Response;
-		AdvanceSteps(Request, TResponseDelegate<TempoScripting::Empty>::CreateLambda([&Response](const TempoScripting::Empty& ResponseIn, grpc::Status Status)
-		{
-			Response = FTempoAdvanceStepsService::Response();
-		}));
-		checkf(Response.IsSet(), TEXT("AdvanceSteps service did not generate response immediately"));
-		return Response.GetValue();
-	}));
-
-	ROSNode->AddService<FTempoSetSimStepsPerSecondService>("SetSimStepsPerSecond", TROSServiceDelegate<FTempoSetSimStepsPerSecondService>::CreateLambda([this](const FTempoSetSimStepsPerSecondService::Request& Request)
-	{
-		TOptional<FTempoSetSimStepsPerSecondService::Response> Response;
-		SetSimStepsPerSecond(Request, TResponseDelegate<TempoScripting::Empty>::CreateLambda([&Response](const TempoScripting::Empty& ResponseIn, grpc::Status Status)
-		{
-			Response = FTempoSetSimStepsPerSecondService::Response();
-		}));
-		checkf(Response.IsSet(), TEXT("SetSimStepsPerSecond service did not generate response immediately"));
-		return Response.GetValue();
-	}));
-
-	ROSNode->AddService<FTempoSetTimeModeService>("SetTimeMode", TROSServiceDelegate<FTempoSetTimeModeService>::CreateLambda([this](const FTempoSetTimeModeService::Request& Request)
-	{
-		TOptional<FTempoSetTimeModeService::Response> Response;
-		SetTimeMode(Request, TResponseDelegate<TempoScripting::Empty>::CreateLambda([&Response](const TempoScripting::Empty& ResponseIn, grpc::Status Status)
-		{
-			Response = FTempoSetTimeModeService::Response();
-		}));
-		checkf(Response.IsSet(), TEXT("SetTimeMode service did not generate response immediately"));
-		return Response.GetValue();
-	}));
-
-	ROSNode->AddService<FTempoEmptyService>("Play", TROSServiceDelegate<FTempoEmptyService>::CreateLambda([this](const FTempoEmptyService::Request& Request)
-	{
-		TOptional<FTempoEmptyService::Response> Response;
-		Play(Request, TResponseDelegate<TempoScripting::Empty>::CreateLambda([&Response](const TempoScripting::Empty& ResponseIn, grpc::Status Status)
-		{
-			Response = ResponseIn;
-		}));
-		checkf(Response.IsSet(), TEXT("Play service did not generate response immediately"));
-		return Response.GetValue();
-	}));
-
-	ROSNode->AddService<FTempoEmptyService>("Pause", TROSServiceDelegate<FTempoEmptyService>::CreateLambda([this](const FTempoEmptyService::Request& Request)
-	{
-		TOptional<FTempoEmptyService::Response> Response;
-		Pause(Request, TResponseDelegate<TempoScripting::Empty>::CreateLambda([&Response](const TempoScripting::Empty& ResponseIn, grpc::Status Status)
-		{
-			Response = ResponseIn;
-		}));
-		checkf(Response.IsSet(), TEXT("Pause service did not generate response immediately"));
-		return Response.GetValue();
-	}));
-
-	ROSNode->AddService<FTempoEmptyService>("Step", TROSServiceDelegate<FTempoEmptyService>::CreateLambda([this](const FTempoEmptyService::Request& Request)
-	{
-		TOptional<FTempoEmptyService::Response> Response;
-		Step(Request, TResponseDelegate<TempoScripting::Empty>::CreateLambda([&Response](const TempoScripting::Empty& ResponseIn, grpc::Status Status)
-		{
-			Response = ResponseIn;
-		}));
-		checkf(Response.IsSet(), TEXT("Step service did not generate response immediately"));
-		return Response.GetValue();
-	}));
+	BindScriptingServiceToROS<FTempoAdvanceStepsService>(ROSNode, "AdvanceSteps", this, &UTempoTimeROSBridgeSubsystem::AdvanceSteps);
+	BindScriptingServiceToROS<FTempoSetSimStepsPerSecondService>(ROSNode, "SetSimStepsPerSecond", this, &UTempoTimeROSBridgeSubsystem::SetSimStepsPerSecond);
+	BindScriptingServiceToROS<FTempoSetTimeModeService>(ROSNode, "SetTimeMode", this, &UTempoTimeROSBridgeSubsystem::SetTimeMode);
+	BindScriptingServiceToROS<FTempoEmptyService>(ROSNode, "Play", this, &UTempoTimeROSBridgeSubsystem::Play);
+	BindScriptingServiceToROS<FTempoEmptyService>(ROSNode, "Pause", this, &UTempoTimeROSBridgeSubsystem::Pause);
+	BindScriptingServiceToROS<FTempoEmptyService>(ROSNode, "Step", this, &UTempoTimeROSBridgeSubsystem::Step);
 }

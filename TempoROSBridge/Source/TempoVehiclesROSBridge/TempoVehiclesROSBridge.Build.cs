@@ -27,6 +27,7 @@ public class TempoVehiclesROSBridge : ModuleRules
                 "TempoScripting",
                 "TempoVehicles",
                 "rclcpp",
+                "TempoROSBridgeShared",
             }
         );
     }

@@ -6,6 +6,8 @@
 
 #include "TempoROSNode.h"
 
+#include "TempoROSBridgeUtils.h"
+
 FString MeasurementTypeStr(TempoSensors::MeasurementType MeasurementType)
 {
 	switch (MeasurementType)
@@ -66,17 +68,7 @@ void UTempoSensorsROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 
 	ROSNode = UTempoROSNode::Create("TempoSensors", this, &InWorld);
-	
-	ROSNode->AddService<FTempoGetAvailableSensors>("GetAvailableSensors", TROSServiceDelegate<FTempoGetAvailableSensors>::CreateLambda([this](const FTempoGetAvailableSensors::Request& Request)
-	{
-		TOptional<FTempoGetAvailableSensors::Response> Response;
-		GetAvailableSensors(Request, TResponseDelegate<TempoSensors::AvailableSensorsResponse>::CreateLambda([&Response](const TempoSensors::AvailableSensorsResponse& ResponseIn, grpc::Status Status)
-		{
-			Response = ResponseIn;
-		}));
-		checkf(Response.IsSet(), TEXT("GetAvailableSensors service did not generate response immediately"));
-		return Response.GetValue();
-	}));
+	BindScriptingServiceToROS<FTempoGetAvailableSensors, UTempoSensorServiceSubsystem>(ROSNode, "GetAvailableSensors", this, &UTempoSensorsROSBridgeSubsystem::GetAvailableSensors);
 
 	InWorld.GetTimerManager().SetTimer(UpdatePublishersTimerHandle, this, &UTempoSensorsROSBridgeSubsystem::UpdatePublishers, UpdatePublishersPeriod, true, 0.0);
 }
@@ -150,14 +142,14 @@ void UTempoSensorsROSBridgeSubsystem::UpdatePublishers()
 					AvailableSensor.owner().c_str(),
 					AvailableSensor.name().c_str());
 
-				if (PossiblyStaleTopics.Contains(Topic))
+				bool bAlreadyHasTopic = PossiblyStaleTopics.Contains(Topic);
+				PossiblyStaleTopics.Remove(Topic);
+				if (bAlreadyHasTopic)
 				{
 					// We already have a publisher for this topic
 					continue;
 				}
-
-				PossiblyStaleTopics.Remove(Topic);
-
+				
 				switch (MeasurementType)
 				{
 					case TempoSensors::COLOR_IMAGE:
