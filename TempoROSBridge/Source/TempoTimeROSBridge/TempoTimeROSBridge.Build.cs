@@ -5,7 +5,7 @@ public class TempoTimeROSBridge : ModuleRules
     public TempoTimeROSBridge(ReadOnlyTargetRules Target) : base(Target)
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-
+        
         PublicDependencyModuleNames.AddRange(
             new string[]
             {
@@ -28,6 +28,7 @@ public class TempoTimeROSBridge : ModuleRules
                 "TempoROS",
                 "rclcpp",
                 "TempoROSBridgeShared",
+                "TempoCoreShared",
             }
         );
     }

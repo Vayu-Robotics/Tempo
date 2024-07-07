@@ -40,8 +40,8 @@ public class TempoTime : TempoModuleRules
 				"SlateCore",
 				"UMG",
 				// Tempo
-				"TempoCoreShared",
 				"TempoScripting",
+				"TempoCoreShared",
 			}
 			);
 		

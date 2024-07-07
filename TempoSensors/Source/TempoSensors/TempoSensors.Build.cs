@@ -24,7 +24,7 @@ public class TempoSensors : TempoModuleRules
 			new string[]
 			{
 				"Core",
-			}
+ 			}
 			);
 			
 		
@@ -41,8 +41,8 @@ public class TempoSensors : TempoModuleRules
 				// Tempo
 				"TempoSensorsShared",
 				"TempoCamera",
-				"TempoCoreShared",
 				"TempoScripting",
+				"TempoCoreShared",
 			}
 			);
 		

@@ -6,6 +6,8 @@ public class TempoSensorsROSBridge : ModuleRules
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
+        OptimizeCode = CodeOptimization.Never;
+        
         PublicDependencyModuleNames.AddRange(
             new string[]
             {
@@ -28,6 +30,7 @@ public class TempoSensorsROSBridge : ModuleRules
                 "TempoROS",
                 "rclcpp",
                 "TempoROSBridgeShared",
+                "TempoCoreShared",
             }
         );
     }

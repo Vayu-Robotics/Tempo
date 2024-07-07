@@ -2,11 +2,11 @@
 
 #pragma once
 
+#include "TempoCoreTypes.h"
 #include "TempoScriptable.h"
 #include "TempoScriptingServer.h"
 
 #include "CoreMinimal.h"
-#include "Subsystems/WorldSubsystem.h"
 #include "TempoGeographicServiceSubsystem.generated.h"
 
 namespace TempoGeographic
@@ -24,7 +24,7 @@ namespace TempoScripting
 }
 
 UCLASS()
-class TEMPOGEOGRAPHIC_API UTempoGeographicServiceSubsystem : public UWorldSubsystem, public ITempoWorldScriptable
+class TEMPOGEOGRAPHIC_API UTempoGeographicServiceSubsystem : public UTempoWorldSubsystem, public ITempoWorldScriptable
 {
 	GENERATED_BODY()
 

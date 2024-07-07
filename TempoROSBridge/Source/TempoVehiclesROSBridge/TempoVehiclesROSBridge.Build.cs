@@ -1,4 +1,6 @@
-﻿using UnrealBuildTool;
+﻿// Copyright Tempo Simulation, LLC. All Rights Reserved
+
+using UnrealBuildTool;
 
 public class TempoVehiclesROSBridge : ModuleRules
 {
@@ -6,6 +8,8 @@ public class TempoVehiclesROSBridge : ModuleRules
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
+        OptimizeCode = CodeOptimization.Never;
+        
         PublicDependencyModuleNames.AddRange(
             new string[]
             {
@@ -28,6 +32,7 @@ public class TempoVehiclesROSBridge : ModuleRules
                 "TempoVehicles",
                 "rclcpp",
                 "TempoROSBridgeShared",
+                "TempoCoreShared",
             }
         );
     }

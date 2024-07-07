@@ -8,41 +8,30 @@ public class TempoROSBridge : ModuleRules
 	public TempoROSBridge(ReadOnlyTargetRules Target) : base(Target)
 	{
 		PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
-		
-		// string Private = Path.Combine(ModuleDirectory, "Private", "ROSGenerated");
-		// System.IO.Directory.CreateDirectory(Private);
-		// PublicIncludePaths.AddRange(
-		// 	new string[]
-		// 	{
-		// 		Private
-		// 	}
-		// );
-		
+
+		OptimizeCode = CodeOptimization.Never;
+
 		PublicDependencyModuleNames.AddRange(
 			new string[]
 			{
+				// Unreal
 				"Core",
+				// Tempo
+				"TempoSensorsROSBridge",
+				"TempoGeographicROSBridge",
+				"TempoTimeROSBridge",
+				"TempoVehiclesROSBridge",
+				"TempoScriptingROSBridge",
 			}
 			);
-			
 		
 		PrivateDependencyModuleNames.AddRange(
 			new string[]
 			{
-				// Unreal
 				"CoreUObject",
 				"Engine",
 				"Slate",
 				"SlateCore",
-				// Tempo
-				"TempoROS",
-				"TempoSensors",
-				"TempoGeographic",
-				"TempoTime",
-				"TempoVehicles",
-				"TempoCamera",
-				"TempoScripting",
-				"rclcpp",
 			}
 			);
 	}

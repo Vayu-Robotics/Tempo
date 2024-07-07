@@ -6,6 +6,8 @@ public class TempoROSBridgeShared : ModuleRules
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
+        OptimizeCode = CodeOptimization.Never;
+        
         PublicDependencyModuleNames.AddRange(
             new string[]
             {

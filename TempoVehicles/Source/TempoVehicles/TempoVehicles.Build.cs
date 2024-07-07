@@ -37,9 +37,9 @@ public class TempoVehicles : TempoModuleRules
 				// Unreal
 				"CoreUObject",
 				// Tempo
-				"TempoCoreShared",
 				"TempoScripting",
 				"TempoVehiclesShared",
+				"TempoCoreShared",
 			}
 			);
 		

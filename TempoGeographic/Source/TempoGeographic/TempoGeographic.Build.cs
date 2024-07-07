@@ -40,6 +40,7 @@ public class TempoGeographic : TempoModuleRules
 				// Tempo
 				"TempoScripting",
 				"TempoTime",
+				"TempoCoreShared",
 			}
 			);
 		

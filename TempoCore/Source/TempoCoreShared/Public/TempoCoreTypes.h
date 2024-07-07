@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Subsystems/WorldSubsystem.h"
 
 #include "TempoCoreTypes.generated.h"
 
@@ -24,4 +25,13 @@ enum class EScriptingCompressionLevel: uint8
 	Low = 1,
 	Med = 2,
 	High = 3
+};
+
+UCLASS()
+class TEMPOCORESHARED_API UTempoWorldSubsystem : public UWorldSubsystem
+{
+	GENERATED_BODY()
+
+public:
+	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
 };

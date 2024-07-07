@@ -7,6 +7,7 @@
 #include "TempoROSNode.h"
 
 #include "TempoROSBridgeUtils.h"
+#include "std_srvs/srv/empty.hpp"
 
 void UTempoGeographicROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
@@ -17,7 +18,8 @@ void UTempoGeographicROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 
-	ROSNode = UTempoROSNode::Create("TempoGeographic", this, &InWorld);
+	ROSNode = UTempoROSNode::Create("TempoGeographic", this);
+	
 	BindScriptingServiceToROS<FTempoSetDayCycleRateService>(ROSNode, "SetDayCycleRate", this, &UTempoGeographicROSBridgeSubsystem::SetDayCycleRelativeRate);
 	BindScriptingServiceToROS<FTempoSetTimeOfDayService>(ROSNode, "SetTimeOfDay", this, &UTempoGeographicROSBridgeSubsystem::SetTimeOfDay);
 	BindScriptingServiceToROS<FTempoSetGeographicReferenceService>(ROSNode, "SetGeographicReference", this, &UTempoGeographicROSBridgeSubsystem::SetGeographicReference);

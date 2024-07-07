@@ -67,9 +67,9 @@ void UTempoSensorsROSBridgeSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		return;
 	}
 
-	ROSNode = UTempoROSNode::Create("TempoSensors", this, &InWorld);
+	ROSNode = UTempoROSNode::Create("TempoSensors", this);
 	BindScriptingServiceToROS<FTempoGetAvailableSensors, UTempoSensorServiceSubsystem>(ROSNode, "GetAvailableSensors", this, &UTempoSensorsROSBridgeSubsystem::GetAvailableSensors);
-
+	
 	InWorld.GetTimerManager().SetTimer(UpdatePublishersTimerHandle, this, &UTempoSensorsROSBridgeSubsystem::UpdatePublishers, UpdatePublishersPeriod, true, 0.0);
 }
 
@@ -181,12 +181,12 @@ void UTempoSensorsROSBridgeSubsystem::UpdatePublishers()
 		ROSNode->RemovePublisher(StaleTopic);
 	}
 
-	const TMap<FString, FTempoROSPublisher>& Publishers = ROSNode->GetPublishers();
+	const TMap<FString, TUniquePtr<FTempoROSPublisher>>& Publishers = ROSNode->GetPublishers();
 	for (const auto& Elem : Publishers)
 	{
 		const FString& Topic = Elem.Key;
-		const FTempoROSPublisher& Publisher = Elem.Value;
-		if (Publisher.HasSubscriptions() && !TopicsWithPendingRequests.Contains(Topic))
+		const TUniquePtr<FTempoROSPublisher>& Publisher = Elem.Value;
+		if (Publisher->HasSubscriptions() && !TopicsWithPendingRequests.Contains(Topic))
 		{
 			const FString MeasurementType = MeasurementTypeFromTopic(Topic);
 			if (MeasurementType == TEXT("color"))
@@ -226,8 +226,8 @@ void UTempoSensorsROSBridgeSubsystem::OnMeasurementReceived(const MeasurementTyp
 	
 	TopicsWithPendingRequests.Remove(Topic);
 
-	const TMap<FString, FTempoROSPublisher>& Publishers = ROSNode->GetPublishers();
-	if (const FTempoROSPublisher* Publisher = Publishers.Find(Topic); Publisher->HasSubscriptions())
+	const TMap<FString, TUniquePtr<FTempoROSPublisher>>& Publishers = ROSNode->GetPublishers();
+	if (const TUniquePtr<FTempoROSPublisher>* Publisher = Publishers.Find(Topic); (*Publisher)->HasSubscriptions())
 	{
 		RequestMeasurement<MeasurementType>(
 			Topic,

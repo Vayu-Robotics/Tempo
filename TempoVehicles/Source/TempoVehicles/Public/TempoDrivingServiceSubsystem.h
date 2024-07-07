@@ -6,8 +6,9 @@
 
 #include "TempoScriptingServer.h"
 
+#include "TempoCoreTypes.h"
+
 #include "CoreMinimal.h"
-#include "Subsystems/WorldSubsystem.h"
 
 #include "TempoDrivingServiceSubsystem.generated.h"
 
@@ -23,7 +24,7 @@ namespace TempoVehicles
 }
 
 UCLASS()
-class TEMPOVEHICLES_API UTempoDrivingServiceSubsystem : public UWorldSubsystem, public ITempoWorldScriptable
+class TEMPOVEHICLES_API UTempoDrivingServiceSubsystem : public UTempoWorldSubsystem, public ITempoWorldScriptable
 {
 	GENERATED_BODY()
 	

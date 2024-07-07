@@ -8,6 +8,8 @@ public class TempoGeographicROSBridge : ModuleRules
     {
         PCHUsage = ModuleRules.PCHUsageMode.UseExplicitOrSharedPCHs;
 
+        OptimizeCode = CodeOptimization.Never;
+        
         PublicDependencyModuleNames.AddRange(
             new string[]
             {
@@ -30,6 +32,7 @@ public class TempoGeographicROSBridge : ModuleRules
                 "TempoROS",
                 "rclcpp",
                 "TempoROSBridgeShared",
+                "TempoCoreShared",
             }
         );
     }

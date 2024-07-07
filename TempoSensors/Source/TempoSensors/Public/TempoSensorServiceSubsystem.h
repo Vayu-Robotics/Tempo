@@ -2,11 +2,11 @@
 
 #pragma once
 
+#include "TempoCoreTypes.h"
 #include "TempoScriptable.h"
 #include "TempoScriptingServer.h"
 
 #include "CoreMinimal.h"
-#include "Subsystems/WorldSubsystem.h"
 
 #include "TempoSensorServiceSubsystem.generated.h"
 
@@ -32,7 +32,7 @@ namespace TempoCamera
 }
 
 UCLASS()
-class TEMPOSENSORS_API UTempoSensorServiceSubsystem : public UWorldSubsystem, public ITempoWorldScriptable
+class TEMPOSENSORS_API UTempoSensorServiceSubsystem : public UTempoWorldSubsystem, public ITempoWorldScriptable
 {
 	GENERATED_BODY()
 	

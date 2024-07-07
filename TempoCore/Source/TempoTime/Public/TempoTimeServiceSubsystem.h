@@ -6,9 +6,12 @@
 
 #include "TempoScriptingServer.h"
 
+#include "TempoCoreTypes.h"
+
+#include "TempoScripting/Empty.pb.h"
+
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
-#include "TempoScripting/Empty.pb.h"
 
 #include "TempoTimeServiceSubsystem.generated.h"
 
@@ -25,7 +28,7 @@ namespace TempoTime
 }
 
 UCLASS()
-class TEMPOTIME_API UTempoTimeServiceSubsystem : public UWorldSubsystem, public ITempoWorldScriptable
+class TEMPOTIME_API UTempoTimeServiceSubsystem : public UTempoWorldSubsystem, public ITempoWorldScriptable
 {
 	GENERATED_BODY()
 	
