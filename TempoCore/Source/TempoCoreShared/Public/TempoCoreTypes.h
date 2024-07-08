@@ -33,5 +33,5 @@ class TEMPOCORESHARED_API UTempoWorldSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
-	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
+	TEMPOCORESHARED_API virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
 };

@@ -23,12 +23,12 @@ public class TempoTimeROSBridge : ModuleRules
                 "SlateCore",
                 // Tempo
                 "TempoTime",
+                "TempoCoreShared",
                 "TempoScriptingROSBridge",
-                "TempoScripting",
                 "TempoROS",
                 "rclcpp",
+                "TempoScripting",
                 "TempoROSBridgeShared",
-                "TempoCoreShared",
             }
         );
     }
