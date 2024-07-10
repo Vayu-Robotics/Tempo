@@ -34,5 +34,7 @@ public class TempoROSBridge : ModuleRules
 				"SlateCore",
 			}
 			);
+
+		bEnableExceptions = true;
 	}
 }

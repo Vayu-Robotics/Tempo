@@ -26,6 +26,7 @@ public class TempoSensorsROSBridge : ModuleRules
                 // Tempo
                 "TempoCamera",
                 "TempoSensors",
+                "TempoSensorsShared",
                 "TempoScripting",
                 "TempoROS",
                 "rclcpp",
