@@ -86,21 +86,14 @@ struct TImplicitToROSConverter<TempoCamera::ColorImage>: TToROSConverter<sensor_
 	static ToType Convert(const FromType& TempoValue)
 	{
 		ToType ToValue;
-		ToValue.encoding = "bgra8";
-		ToValue.data.reserve(TempoValue.data().size() * 4 / 3);
-		for (int32 I = 0; I < TempoValue.data().size(); I+=3)
-		{
-			ToValue.data.push_back(TempoValue.data().at(I));
-			ToValue.data.push_back(TempoValue.data().at(I+ 1));
-			ToValue.data.push_back(TempoValue.data().at(I + 2));
-			ToValue.data.push_back(0);
-		}
-		// ToValue.data.assign(TempoValue.data().begin(), TempoValue.data().end());
+		ToValue.encoding = "bgr8";
+		ToValue.data.assign(TempoValue.data().begin(), TempoValue.data().end());
 		ToValue.width = TempoValue.width();
 		ToValue.height = TempoValue.height();
-		ToValue.header.frame_id = TempoValue.header().sequence_id();
+		ToValue.header.frame_id = "world";
 		ToValue.header.stamp.sec = static_cast<int>(TempoValue.header().capture_time());
 		ToValue.header.stamp.nanosec = 1e9 * (TempoValue.header().capture_time() - static_cast<int>(TempoValue.header().capture_time()));
+		ToValue.step = TempoValue.width() * 3;
 		return ToValue;
 	}
 };

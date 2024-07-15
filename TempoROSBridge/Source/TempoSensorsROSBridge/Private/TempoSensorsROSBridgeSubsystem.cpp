@@ -37,6 +37,11 @@ FString TopicFromSensorInfo(TempoSensors::MeasurementType MeasurementType, const
 	return FString::Printf(TEXT("%s/%s/%s"), *MeasurementTypeStr(MeasurementType), *OwnerName.ToLower(), *SensorName.ToLower());
 }
 
+FString CameraInfoTopicFromBaseTopic(const FString& BaseTopic)
+{
+	return FString::Printf(TEXT("%s/camera_info"), *BaseTopic);
+}
+
 FString SensorNameFromTopic(const FString& Topic)
 {
 	TArray<FString> SplitTopic;
@@ -142,6 +147,8 @@ void UTempoSensorsROSBridgeSubsystem::UpdatePublishers()
 					AvailableSensor.owner().c_str(),
 					AvailableSensor.name().c_str());
 
+				const FString CameraInfoTopic = CameraInfoTopicFromBaseTopic(Topic);
+
 				bool bAlreadyHasTopic = PossiblyStaleTopics.Contains(Topic);
 				PossiblyStaleTopics.Remove(Topic);
 				if (bAlreadyHasTopic)
@@ -155,16 +162,50 @@ void UTempoSensorsROSBridgeSubsystem::UpdatePublishers()
 					case TempoSensors::COLOR_IMAGE:
 						{
 							ROSNode->AddPublisher<TempoCamera::ColorImage>(Topic);
+							sensor_msgs::msg::CameraInfo CameraInfo;
+							
+							CameraInfo.header.frame_id = "world";
+							CameraInfo.header.stamp.sec = static_cast<int>(0.0);
+							CameraInfo.header.stamp.nanosec = 1e9 * (0.0);
+
+							const double Height = 540;
+							const double Width = 16 * 540 / 9;
+									
+							CameraInfo.height = Height;
+							CameraInfo.width = Width;
+
+							const double Fx = (Width / 2.0) / FMath::Tan(90.0 * M_PI / 360.0);
+							const double Fy = (Height / 2.0) / FMath::Tan(90.0 * M_PI / 360.0);
+							const double Cx = Width / 2.0;
+							const double Cy = Height / 2.0;
+
+							CameraInfo.k = {Fx, 0.0, Cx,
+											  0.0, Fy, Cy,
+											  0.0, 0.0, 1.0};
+
+							CameraInfo.r = {1.0, 0.0, 0.0,
+											  0.0, 1.0, 0.0,
+											  0.0, 0.0, 1.0};
+
+							CameraInfo.p = {Fx, 0.0, Cx, 0.0,
+											  0.0, Fy, Cy, 0.0,
+											  0.0, 0.0, 1.0, 0.0};
+									
+							CameraInfo.distortion_model = "plumb_bob";
+							CameraInfo.d = {0.0, 0.0, 0.0, 0.0, 0.0};
+							ROSNode->Publish(CameraInfoTopicFromBaseTopic(Topic), CameraInfo);
 							break;
 						}
 					case TempoSensors::DEPTH_IMAGE:
 						{
 							ROSNode->AddPublisher<TempoCamera::DepthImage>(Topic);
+							ROSNode->AddPublisher<sensor_msgs::msg::CameraInfo>(CameraInfoTopic);
 							break;
 						}
 					case TempoSensors::LABEL_IMAGE:
 						{
 							ROSNode->AddPublisher<TempoCamera::LabelImage>(Topic);
+							ROSNode->AddPublisher<sensor_msgs::msg::CameraInfo>(CameraInfoTopic);
 							break;
 						}
 					default:
@@ -178,7 +219,7 @@ void UTempoSensorsROSBridgeSubsystem::UpdatePublishers()
 
 	for (const FString& StaleTopic : PossiblyStaleTopics)
 	{
-		ROSNode->RemovePublisher(StaleTopic);
+		// ROSNode->RemovePublisher(StaleTopic);
 	}
 
 	const TMap<FString, TUniquePtr<FTempoROSPublisher>>& Publishers = ROSNode->GetPublishers();
@@ -219,6 +260,8 @@ void UTempoSensorsROSBridgeSubsystem::UpdatePublishers()
 template <typename MeasurementType>
 void UTempoSensorsROSBridgeSubsystem::OnMeasurementReceived(const MeasurementType& Image, grpc::Status Status, FString Topic)
 {
+	FScopeLock Lock(&MeasurementReceivedMutex);
+	
 	if (Status.ok())
 	{
 		ROSNode->Publish(Topic, Image);
