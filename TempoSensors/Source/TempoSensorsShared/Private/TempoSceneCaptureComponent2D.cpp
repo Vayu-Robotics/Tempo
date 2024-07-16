@@ -83,7 +83,7 @@ void UTempoSceneCaptureComponent2D::InitRenderTarget()
 		TextureTarget->GetFormat(),
 		&TextureRHICopy
 	};
-
+	
 	ENQUEUE_RENDER_COMMAND(InitCommand)(
 		[Context](FRHICommandList& RHICmdList)
 		{
