@@ -4,8 +4,11 @@
 
 #include "TempoROSConversion.h"
 
+#include "TempoSensorsROSBridgeTypes.h"
+
 #include "tempo_sensors_ros_bridge/srv/get_available_sensors.hpp"
 #include "sensor_msgs/msg/image.hpp"
+#include "sensor_msgs/msg/camera_info.hpp"
 
 #include "TempoSensors/Sensors.grpc.pb.h"
 #include "TempoCamera/Camera.pb.h"
@@ -90,7 +93,7 @@ struct TImplicitToROSConverter<TempoCamera::ColorImage>: TToROSConverter<sensor_
 		ToValue.data.assign(TempoValue.data().begin(), TempoValue.data().end());
 		ToValue.width = TempoValue.width();
 		ToValue.height = TempoValue.height();
-		ToValue.header.frame_id = "world";
+		ToValue.header.frame_id = TempoValue.header().sensor_name();
 		ToValue.header.stamp.sec = static_cast<int>(TempoValue.header().capture_time());
 		ToValue.header.stamp.nanosec = 1e9 * (TempoValue.header().capture_time() - static_cast<int>(TempoValue.header().capture_time()));
 		ToValue.step = TempoValue.width() * 3;
@@ -105,9 +108,14 @@ struct TImplicitToROSConverter<TempoCamera::DepthImage>: TToROSConverter<sensor_
 	{
 		ToType ToValue;
 		ToValue.encoding = "32FC1";
-		ToValue.data.assign(TempoValue.depths().begin(), TempoValue.depths().end());
+		ToValue.data.resize(TempoValue.depths().size() * 4);
+		FMemory::Memcpy(&ToValue.data[0], &TempoValue.depths()[0], TempoValue.depths().size() * 4);
 		ToValue.width = TempoValue.width();
 		ToValue.height = TempoValue.height();
+		ToValue.header.frame_id = TempoValue.header().sensor_name();
+		ToValue.header.stamp.sec = static_cast<int>(TempoValue.header().capture_time());
+		ToValue.header.stamp.nanosec = 1e9 * (TempoValue.header().capture_time() - static_cast<int>(TempoValue.header().capture_time()));
+		ToValue.step = TempoValue.width() * 4;
 		return ToValue;
 	}
 };
@@ -122,6 +130,47 @@ struct TImplicitToROSConverter<TempoCamera::LabelImage>: TToROSConverter<sensor_
 		ToValue.data.assign(TempoValue.data().begin(), TempoValue.data().end());
 		ToValue.width = TempoValue.width();
 		ToValue.height = TempoValue.height();
+		ToValue.header.frame_id = TempoValue.header().sensor_name();
+		ToValue.header.stamp.sec = static_cast<int>(TempoValue.header().capture_time());
+		ToValue.header.stamp.nanosec = 1e9 * (TempoValue.header().capture_time() - static_cast<int>(TempoValue.header().capture_time()));
+		ToValue.step = TempoValue.width();
+		return ToValue;
+	}
+};
+
+template <>
+struct TImplicitToROSConverter<FTempoCameraInfo>: TToROSConverter<sensor_msgs::msg::CameraInfo, FTempoCameraInfo>
+{
+	static ToType Convert(const FromType& TempoValue)
+	{
+		ToType ToValue;
+
+		ToValue.header.frame_id = TCHAR_TO_UTF8(*TempoValue.FrameId);
+		ToValue.header.stamp.sec = TempoValue.Timestamp;
+		ToValue.header.stamp.nanosec = 1e9 * (TempoValue.Timestamp - ToValue.header.stamp.sec);
+		
+		ToValue.width = 2.0 * TempoValue.Intrinsics.Cx;
+		ToValue.height = 2.0 * TempoValue.Intrinsics.Cy;
+				
+		const float Fx = TempoValue.Intrinsics.Fx;
+		const double Fy = TempoValue.Intrinsics.Fy;
+		const double Cx = TempoValue.Intrinsics.Cx;
+		const double Cy = TempoValue.Intrinsics.Cy;
+				
+		ToValue.k = {Fx, 0.0, Cx,
+						  0.0, Fy, Cy,
+						  0.0, 0.0, 1.0};
+				
+		ToValue.r = {1.0, 0.0, 0.0,
+						  0.0, 1.0, 0.0,
+						  0.0, 0.0, 1.0};
+				
+		ToValue.p = {Fx, 0.0, Cx, 0.0,
+						  0.0, Fy, Cy, 0.0,
+						  0.0, 0.0, 1.0, 0.0};
+												
+		ToValue.distortion_model = "plumb_bob";
+		ToValue.d = {0.0, 0.0, 0.0, 0.0, 0.0};
 		return ToValue;
 	}
 };

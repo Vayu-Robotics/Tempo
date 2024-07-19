@@ -4,23 +4,27 @@
 
 #include "TempoSensorsROSConverters.h"
 
-#include "TempoROSNode.h"
-
 #include "TempoROSBridgeUtils.h"
 
-FString MeasurementTypeStr(TempoSensors::MeasurementType MeasurementType)
+#include "TempoROSNode.h"
+
+#include "TempoSensorInterface.h"
+#include "TempoCamera.h"
+#include "TempoROSSettings.h"
+
+FString MeasurementTypeTopicStr(EMeasurementType MeasurementType)
 {
 	switch (MeasurementType)
 	{
-	case TempoSensors::COLOR_IMAGE:
+	case COLOR_IMAGE:
 		{
 			return TEXT("image/color");
 		}
-	case TempoSensors::DEPTH_IMAGE:
+	case DEPTH_IMAGE:
 		{
 			return TEXT("image/depth");
 		}
-	case TempoSensors::LABEL_IMAGE:
+	case LABEL_IMAGE:
 		{
 			return TEXT("image/label");
 		}
@@ -32,9 +36,9 @@ FString MeasurementTypeStr(TempoSensors::MeasurementType MeasurementType)
 	}
 }
 
-FString TopicFromSensorInfo(TempoSensors::MeasurementType MeasurementType, const FString& OwnerName, const FString& SensorName)
+FString TopicFromSensorInfo(EMeasurementType MeasurementType, const FString& OwnerName, const FString& SensorName)
 {
-	return FString::Printf(TEXT("%s/%s/%s"), *MeasurementTypeStr(MeasurementType), *OwnerName.ToLower(), *SensorName.ToLower());
+	return FString::Printf(TEXT("%s/%s/%s"), *MeasurementTypeTopicStr(MeasurementType), *OwnerName.ToLower(), *SensorName.ToLower());
 }
 
 FString CameraInfoTopicFromBaseTopic(const FString& BaseTopic)
@@ -133,79 +137,41 @@ void UTempoSensorsROSBridgeSubsystem::UpdatePublishers()
 {
 	const TempoSensors::AvailableSensorsRequest Request;
 	TSet<FString> PossiblyStaleTopics = ROSNode->GetPublishedTopics();
-	GetAvailableSensors(
-		Request,
-		TResponseDelegate<TempoSensors::AvailableSensorsResponse>::CreateLambda(
-			[this, &PossiblyStaleTopics](const TempoSensors::AvailableSensorsResponse& Response, grpc::Status)
+	ForEachSensor([this, &PossiblyStaleTopics](const ITempoSensorInterface* Sensor)
 	{
-		for (const TempoSensors::SensorDescriptor& AvailableSensor : Response.available_sensors())
+		const FString OwnerName = Sensor->GetOwnerName();
+		const FString SensorName = Sensor->GetSensorName();
+		const float Rate = Sensor->GetRate();
+		for (const EMeasurementType MeasurementType : Sensor->GetMeasurementTypes())
 		{
-			for (const auto MeasurementType : AvailableSensor.measurement_types())
+			const FString Topic = TopicFromSensorInfo(MeasurementType, OwnerName, SensorName);
+			
+			bool bAlreadyHasTopic = PossiblyStaleTopics.Contains(Topic);
+			PossiblyStaleTopics.Remove(Topic);
+			
+			if (!bAlreadyHasTopic)
 			{
-				const FString Topic = TopicFromSensorInfo(
-					static_cast<TempoSensors::MeasurementType>(MeasurementType),
-					AvailableSensor.owner().c_str(),
-					AvailableSensor.name().c_str());
-
-				const FString CameraInfoTopic = CameraInfoTopicFromBaseTopic(Topic);
-
-				bool bAlreadyHasTopic = PossiblyStaleTopics.Contains(Topic);
-				PossiblyStaleTopics.Remove(Topic);
-				if (bAlreadyHasTopic)
+				if (const UTempoCamera* Camera = Cast<UTempoCamera>(Sensor))
 				{
-					// We already have a publisher for this topic
-					continue;
+					const FString CameraInfoTopic = CameraInfoTopicFromBaseTopic(Topic);
+					ROSNode->AddPublisher<FTempoCameraInfo>(CameraInfoTopic, FROSQOSProfile(1).Reliable());
 				}
 				
 				switch (MeasurementType)
 				{
-					case TempoSensors::COLOR_IMAGE:
+					case COLOR_IMAGE:
 						{
-							ROSNode->AddPublisher<TempoCamera::ColorImage>(Topic);
-							sensor_msgs::msg::CameraInfo CameraInfo;
-							
-							CameraInfo.header.frame_id = "world";
-							CameraInfo.header.stamp.sec = static_cast<int>(0.0);
-							CameraInfo.header.stamp.nanosec = 1e9 * (0.0);
-
-							const double Height = 540;
-							const double Width = 16 * 540 / 9;
-									
-							CameraInfo.height = Height;
-							CameraInfo.width = Width;
-
-							const double Fx = (Width / 2.0) / FMath::Tan(90.0 * M_PI / 360.0);
-							const double Fy = (Height / 2.0) / FMath::Tan(90.0 * M_PI / 360.0);
-							const double Cx = Width / 2.0;
-							const double Cy = Height / 2.0;
-
-							CameraInfo.k = {Fx, 0.0, Cx,
-											  0.0, Fy, Cy,
-											  0.0, 0.0, 1.0};
-
-							CameraInfo.r = {1.0, 0.0, 0.0,
-											  0.0, 1.0, 0.0,
-											  0.0, 0.0, 1.0};
-
-							CameraInfo.p = {Fx, 0.0, Cx, 0.0,
-											  0.0, Fy, Cy, 0.0,
-											  0.0, 0.0, 1.0, 0.0};
-									
-							CameraInfo.distortion_model = "plumb_bob";
-							CameraInfo.d = {0.0, 0.0, 0.0, 0.0, 0.0};
-							ROSNode->Publish(CameraInfoTopicFromBaseTopic(Topic), CameraInfo);
+							ROSNode->AddPublisher<TempoCamera::ColorImage>(Topic, FROSQOSProfile(1).Reliable());
 							break;
 						}
-					case TempoSensors::DEPTH_IMAGE:
+					case DEPTH_IMAGE:
 						{
-							ROSNode->AddPublisher<TempoCamera::DepthImage>(Topic);
-							ROSNode->AddPublisher<sensor_msgs::msg::CameraInfo>(CameraInfoTopic);
+							ROSNode->AddPublisher<TempoCamera::DepthImage>(Topic, FROSQOSProfile(1).Reliable());
 							break;
 						}
-					case TempoSensors::LABEL_IMAGE:
+					case LABEL_IMAGE:
 						{
-							ROSNode->AddPublisher<TempoCamera::LabelImage>(Topic);
-							ROSNode->AddPublisher<sensor_msgs::msg::CameraInfo>(CameraInfoTopic);
+							ROSNode->AddPublisher<TempoCamera::LabelImage>(Topic, FROSQOSProfile(1).Reliable());
 							break;
 						}
 					default:
@@ -214,12 +180,32 @@ void UTempoSensorsROSBridgeSubsystem::UpdatePublishers()
 						}
 				}
 			}
+
+			if (const UTempoCamera* Camera = Cast<UTempoCamera>(Sensor))
+			{
+				const FString CameraInfoTopic = CameraInfoTopicFromBaseTopic(Topic);
+				PossiblyStaleTopics.Remove(CameraInfoTopic);
+				
+				FTempoCameraInfo CameraInfoMessage(Camera->GetIntrinsics(),
+					GetDefault<UTempoROSSettings>()->GetFixedFrameName(),
+					GetWorld()->GetTimeSeconds());
+
+				ROSNode->Publish(CameraInfoTopicFromBaseTopic(Topic), CameraInfoMessage);
+			}
+
+			if (const USceneComponent* SensorSceneComponent = Cast<USceneComponent>(Sensor))
+			{
+				ROSNode->PublishStaticTransform(SensorSceneComponent->GetComponentTransform(),
+			FString::Printf(TEXT("%s/%s"), *Sensor->GetOwnerName(), *Sensor->GetSensorName()),
+			GetDefault<UTempoROSSettings>()->GetFixedFrameName(),
+			GetWorld()->GetTimeSeconds());
+			}
 		}
-	}));
+	});
 
 	for (const FString& StaleTopic : PossiblyStaleTopics)
 	{
-		// ROSNode->RemovePublisher(StaleTopic);
+		ROSNode->RemovePublisher(StaleTopic);
 	}
 
 	const TMap<FString, TUniquePtr<FTempoROSPublisher>>& Publishers = ROSNode->GetPublishers();
