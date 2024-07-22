@@ -31,5 +31,7 @@ public class TempoTimeROSBridge : ModuleRules
                 "TempoROSBridgeShared",
             }
         );
+        
+        bEnableExceptions = true;
     }
 }

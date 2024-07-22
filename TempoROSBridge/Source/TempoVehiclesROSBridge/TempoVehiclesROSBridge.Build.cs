@@ -35,5 +35,7 @@ public class TempoVehiclesROSBridge : ModuleRules
                 "TempoCoreShared",
             }
         );
+        
+        bEnableExceptions = true;
     }
 }

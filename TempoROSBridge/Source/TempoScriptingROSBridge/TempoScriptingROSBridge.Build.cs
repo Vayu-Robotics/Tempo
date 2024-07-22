@@ -29,5 +29,7 @@ public class TempoScriptingROSBridge : ModuleRules
                 "SlateCore",
             }
         );
+        
+        bEnableExceptions = true;
     }
 }

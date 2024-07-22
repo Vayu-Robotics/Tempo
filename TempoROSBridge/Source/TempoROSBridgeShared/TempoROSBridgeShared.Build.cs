@@ -30,5 +30,7 @@ public class TempoROSBridgeShared : ModuleRules
                 "TempoROS",
             }
         );
+        
+        bEnableExceptions = true;
     }
 }

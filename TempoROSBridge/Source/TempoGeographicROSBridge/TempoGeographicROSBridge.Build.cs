@@ -35,5 +35,7 @@ public class TempoGeographicROSBridge : ModuleRules
                 "TempoCoreShared",
             }
         );
+        
+        bEnableExceptions = true;
     }
 }

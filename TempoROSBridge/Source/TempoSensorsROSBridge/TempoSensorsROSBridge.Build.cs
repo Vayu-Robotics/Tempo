@@ -34,5 +34,7 @@ public class TempoSensorsROSBridge : ModuleRules
                 "TempoCoreShared",
             }
         );
+        
+        bEnableExceptions = true;
     }
 }
