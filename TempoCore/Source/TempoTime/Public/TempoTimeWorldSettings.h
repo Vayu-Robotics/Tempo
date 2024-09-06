@@ -28,6 +28,8 @@ protected:
 private:	
 	UFUNCTION()
 	void OnTimeSettingsChanged();
+
+	void OnPreWorldActorTick(UWorld* World, ELevelTick TickType,  float DeltaSeconds);
 	
 	UPROPERTY(VisibleAnywhere)
 	uint64 CyclesWhenTimeModeChanged = 0;
@@ -39,4 +41,7 @@ private:
 	uint64 FixedStepsCount = 0;
 
 	TOptional<int32> StepsToSimulate;
+
+	UPROPERTY(VisibleAnywhere)
+	double SimTime = 0;
 };

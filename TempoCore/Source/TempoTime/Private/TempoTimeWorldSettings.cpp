@@ -11,6 +11,16 @@ void ATempoTimeWorldSettings::BeginPlay()
 
 	GetMutableDefault<UTempoCoreSettings>()->TempoCoreTimeSettingsChangedEvent.AddUObject(this, &ATempoTimeWorldSettings::OnTimeSettingsChanged);
 	OnTimeSettingsChanged();
+
+	FWorldDelegates::OnWorldPreActorTick.AddUObject(this, &ATempoTimeWorldSettings::OnPreWorldActorTick);
+}
+
+void ATempoTimeWorldSettings::OnPreWorldActorTick(UWorld* World, ELevelTick TickType, float DeltaSeconds)
+{
+	if (World == GetWorld())
+	{
+		SimTime = World->GetTimeSeconds();
+	}
 }
 
 float ATempoTimeWorldSettings::FixupDeltaSeconds(float DeltaSeconds, float RealDeltaSeconds)
@@ -26,7 +36,7 @@ float ATempoTimeWorldSettings::FixupDeltaSeconds(float DeltaSeconds, float RealD
 	// This is the simulation time *before* the frame we are preparing to start.
 	// Our job is to return the time to add to this time that will result in the
 	// sim time we want it to be at the end of this frame.
-	const double SimTime = GetWorld()->GetTimeSeconds();
+	// SimTime = GetWorld()->GetTimeSeconds();
 
 	const UTempoCoreSettings* Settings = GetDefault<UTempoCoreSettings>();
 	
@@ -65,15 +75,13 @@ float ATempoTimeWorldSettings::FixupDeltaSeconds(float DeltaSeconds, float RealD
 			checkf(false, TEXT("Unhandled time mode in FixupDeltaSeconds"));
 		}
 	}
-	
+
+	// SimTime += DeltaSeconds;
 	return DeltaSeconds;
 }
 
 void ATempoTimeWorldSettings::OnTimeSettingsChanged()
 {
-	check(GetWorld());
-	const double SimTime = GetWorld()->GetTimeSeconds();
-	
 	const UTempoCoreSettings* Settings = GetDefault<UTempoCoreSettings>();
 	
 	CyclesWhenTimeModeChanged = FPlatformTime::Cycles64();
