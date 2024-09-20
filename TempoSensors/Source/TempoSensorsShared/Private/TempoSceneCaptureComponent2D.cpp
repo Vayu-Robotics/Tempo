@@ -21,6 +21,26 @@ void UTempoSceneCaptureComponent2D::BeginPlay()
 	Super::BeginPlay();
 	
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &UTempoSceneCaptureComponent2D::MaybeCapture, 1.0 / RateHz, true);
+
+	FCoreDelegates::OnEndFrameRT.AddUObject(this, &UTempoSceneCaptureComponent2D::OnRenderFrameCompleted);
+}
+
+void UTempoSceneCaptureComponent2D::OnRenderFrameCompleted()
+{
+	const FRenderTarget* RenderTarget = TextureTarget->GetRenderTargetResource();
+	if (!RenderTarget)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("RenderTarget is not initialized"));
+		TextureReadQueue.SkipNextPendingTextureRead();
+		return;
+	}
+	if (!TextureRHICopy.IsValid())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("TextureRHICopy is not valid"));
+		TextureReadQueue.SkipNextPendingTextureRead();
+		return;
+	}
+	TextureReadQueue.BeginNextPendingTextureRead(RenderTarget, TextureRHICopy);
 }
 
 FString UTempoSceneCaptureComponent2D::GetOwnerName() const
@@ -98,4 +118,19 @@ void UTempoSceneCaptureComponent2D::InitRenderTarget()
 
 			*Context.TextureRHICopy = RHICreateTexture(Desc);
 		});
+}
+
+TOptional<TFuture<void>> UTempoSceneCaptureComponent2D::FlushMeasurementResponses()
+{
+	if (TUniquePtr<FTextureRead> TextureRead = TextureReadQueue.DequeuePendingTextureRead())
+	{
+		return DecodeAndRespond(MoveTemp(TextureRead));
+	}
+	
+	return TOptional<TFuture<void>>();
+}
+
+void UTempoSceneCaptureComponent2D::FlushPendingRenderingCommands() const
+{
+	TextureReadQueue.FlushPendingTextureReads();
 }

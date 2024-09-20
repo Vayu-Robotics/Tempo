@@ -10,47 +10,115 @@
 
 #include "TempoSceneCaptureComponent2D.generated.h"
 
-template <typename PixelType>
-struct TTextureRead
+struct FTextureRead
 {
-	TTextureRead(const FIntPoint& ImageSizeIn, int32 SequenceIdIn, double CaptureTimeIn)
-		   : ImageSize(ImageSizeIn), SequenceId(SequenceIdIn), CaptureTime(CaptureTimeIn)
+	FTextureRead(const FIntPoint& ImageSizeIn, int32 SequenceIdIn, double CaptureTimeIn, const FString& OwnerNameIn, const FString& SensorNameIn)
+		: ImageSize(ImageSizeIn), SequenceId(SequenceIdIn), CaptureTime(CaptureTimeIn), OwnerName(OwnerNameIn), SensorName(SensorNameIn) {}
+
+	virtual ~FTextureRead() {}
+
+	virtual void BeginRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy) = 0;
+
+	virtual FName GetType() const = 0;
+
+	void WaitForReadCompleted() const
+	{
+		while (!bReadCompleted)
+		{
+			FPlatformProcess::Sleep(1e-4);
+		}
+	}
+	
+	FIntPoint ImageSize;
+	int32 SequenceId;
+	double CaptureTime;
+	const FString OwnerName;
+	const FString SensorName;
+	TAtomic<bool> bReadCompleted = false;
+};
+
+template <typename PixelType>
+struct TTextureReadBase : FTextureRead
+{
+	TTextureReadBase(const FIntPoint& ImageSizeIn, int32 SequenceIdIn, double CaptureTimeIn, const FString& OwnerNameIn, const FString& SensorNameIn)
+		   : FTextureRead(ImageSizeIn, SequenceIdIn, CaptureTimeIn, OwnerNameIn, SensorNameIn)
 	{
 		Image.SetNumUninitialized(ImageSize.X * ImageSize.Y);
 	}
 
-	FIntPoint ImageSize;
-	int32 SequenceId;
-	double CaptureTime;
+	virtual void BeginRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy) override
+	{
+		FRHICommandListImmediate& RHICmdList = FRHICommandListImmediate::Get();
+
+		// Then, transition our TextureTarget to be copyable.
+		RHICmdList.Transition(FRHITransitionInfo(RenderTarget->GetRenderTargetTexture(), ERHIAccess::Unknown, ERHIAccess::CopySrc));
+
+		// Then, copy our TextureTarget to another that can be mapped and read by the CPU.
+		RHICmdList.CopyTexture(RenderTarget->GetRenderTargetTexture(), TextureRHICopy, FRHICopyTextureInfo());
+
+		// Write a GPU fence to wait for the above copy to complete before reading the data.
+		const FGPUFenceRHIRef Fence = RHICreateGPUFence(TEXT("TempoCameraTextureRead"));
+		RHICmdList.WriteGPUFence(Fence);
+
+		// Lastly, read the raw data from the copied TextureTarget on the CPU.
+		void* OutBuffer;
+		int32 SurfaceWidth, SurfaceHeight;
+		GDynamicRHI->RHIMapStagingSurface(TextureRHICopy, Fence, OutBuffer, SurfaceWidth, SurfaceHeight, RHICmdList.GetGPUMask().ToIndex());
+		FMemory::Memcpy(Image.GetData(), OutBuffer, SurfaceWidth * SurfaceHeight * sizeof(PixelType));
+		RHICmdList.UnmapStagingSurface(TextureRHICopy);
+		
+		bReadCompleted = true;
+	}
+	
 	TArray<PixelType> Image;
-	FRenderCommandFence RenderFence;
 };
 
 template <typename PixelType>
-struct TTextureReadQueue
+struct TTextureRead : TTextureReadBase<PixelType>
+{
+	using TTextureReadBase<PixelType>::TTextureReadBase;
+};
+
+struct FTextureReadQueue
 {
 	int32 GetNumPendingTextureReads() const { return PendingTextureReads.Num(); }
 	
-	bool HasOutstandingTextureReads() const { return !PendingTextureReads.IsEmpty() && !PendingTextureReads[0]->RenderFence.IsFenceComplete(); }
+	bool HasOutstandingTextureReads() const { return !PendingTextureReads.IsEmpty() && !PendingTextureReads[0]->bReadCompleted; }
 	
-	void EnqueuePendingTextureRead(TTextureRead<PixelType>* TextureRead)
+	void EnqueuePendingTextureRead(FTextureRead* TextureRead)
 	{
 		PendingTextureReads.Emplace(TextureRead);
+	}
+
+	void BeginNextPendingTextureRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy)
+	{
+		if (!PendingTextureReads.IsEmpty())
+		{
+			PendingTextureReads[0]->BeginRead(RenderTarget, TextureRHICopy);
+		}
+	}
+
+	void SkipNextPendingTextureRead()
+	{
+		if (!PendingTextureReads.IsEmpty())
+		{
+			PendingTextureReads.RemoveAt(0);
+		}
 	}
 
 	void FlushPendingTextureReads() const
 	{
 		for (const auto& PendingTextureRead : PendingTextureReads)
 		{
-			PendingTextureRead->RenderFence.Wait();
+			PendingTextureRead->WaitForReadCompleted();
 		}
 	}
 
-	TUniquePtr<TTextureRead<PixelType>> DequeuePendingTextureRead()
+	TUniquePtr<FTextureRead> DequeuePendingTextureRead()
 	{
-		if (!PendingTextureReads.IsEmpty() && PendingTextureReads[0]->RenderFence.IsFenceComplete())
+		if (!PendingTextureReads.IsEmpty() && PendingTextureReads[0]->bReadCompleted)
 		{
-			TUniquePtr<TTextureRead<PixelType>> TextureRead(PendingTextureReads[0].Release());
+			TUniquePtr<FTextureRead> TextureRead(PendingTextureReads[0].Release());
 			PendingTextureReads.RemoveAt(0);
 			return MoveTemp(TextureRead);
 		}
@@ -58,7 +126,7 @@ struct TTextureReadQueue
 	}
 
 private:
-	TArray<TUniquePtr<TTextureRead<PixelType>>> PendingTextureReads;
+	TArray<TUniquePtr<FTextureRead>> PendingTextureReads;
 };
 
 UCLASS(Abstract)
@@ -69,6 +137,10 @@ class TEMPOSENSORSSHARED_API UTempoSceneCaptureComponent2D : public USceneCaptur
 public:
 	UTempoSceneCaptureComponent2D();
 
+	virtual void BeginPlay() override;
+
+	virtual void UpdateSceneCaptureContents(FSceneInterface* Scene) override;
+
 	virtual FString GetOwnerName() const override;
 
 	virtual FString GetSensorName() const override;
@@ -77,21 +149,18 @@ public:
 	
 	virtual const TArray<TEnumAsByte<EMeasurementType>>& GetMeasurementTypes() const override { return MeasurementTypes; }
 	
-	virtual void UpdateSceneCaptureContents(FSceneInterface* Scene) override;
-
-	virtual TOptional<TFuture<void>> FlushMeasurementResponses() override { return TOptional<TFuture<void>>(); }
-
-	virtual bool HasPendingRenderingCommands() override { return false; }
-
-	virtual void FlushPendingRenderingCommands() const override {}
+	virtual bool HasPendingRenderingCommands() override { return TextureReadQueue.HasOutstandingTextureReads(); }
 	
+	virtual void FlushPendingRenderingCommands() const override;
+
+	virtual TOptional<TFuture<void>> FlushMeasurementResponses() override;
+
+	virtual TFuture<void> DecodeAndRespond(TUniquePtr<FTextureRead> TextureRead) PURE_VIRTUAL(UTempoSceneCaptureComponent2D::DecodeAndRespond, return TFuture<void>(); );
+
 protected:
-	virtual void BeginPlay() override;
+	void OnRenderFrameCompleted();
 
 	virtual bool HasPendingRequests() const { return false; }
-
-	template <typename PixelType>
-	TTextureRead<PixelType>* EnqueueTextureRead() const;
 
 	UPROPERTY(VisibleAnywhere)
 	TEnumAsByte<ETextureRenderTargetFormat> RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
@@ -112,60 +181,14 @@ protected:
 	int32 SequenceId = 0;
 	
 	void InitRenderTarget();
+
+	FTextureReadQueue TextureReadQueue;
 	
 private:
 	void MaybeCapture();
-	
-	FTimerHandle TimerHandle;
 
 	// We must copy our TextureTarget's resource here before reading it on the CPU.
 	mutable FTextureRHIRef TextureRHICopy;
+
+	FTimerHandle TimerHandle;
 };
-
-// Enqueue a read of our full render target, reinterpreting the raw pixels as PixelType.
-// The render target pixel format must already be a compatible type.
-template <typename PixelType>
-TTextureRead<PixelType>* UTempoSceneCaptureComponent2D::EnqueueTextureRead() const
-{
-	TTextureRead<PixelType>* TextureRead = new TTextureRead<PixelType>(SizeXY, SequenceId, GetWorld()->GetTimeSeconds());
-
-	struct FReadSurfaceContext{
-		FRenderTarget* RenderTarget;
-		TArray<PixelType>* Image;
-	        FTextureRHIRef TextureRHICopy;
-	};
-
-	FReadSurfaceContext Context = {
-		TextureTarget->GameThread_GetRenderTargetResource(),
-		&TextureRead->Image,
-	        TextureRHICopy
-	};
-
-	ENQUEUE_RENDER_COMMAND(ReadSurfaceCommand)(
-		[Context](FRHICommandListImmediate& RHICmdList)
-		{
-			void* OutBuffer;
-			int32 SurfaceWidth, SurfaceHeight;
-			// First, check that the source and destination formats are the same. They can differ on the first render after transitioning formats.
-			// TODO: Can this situation be prevented?
-			if (Context.RenderTarget->GetRenderTargetTexture()->GetFormat() != Context.TextureRHICopy->GetFormat())
-			{
-				return;
-			}
-                        // Then, transition our TextureTarget to be copyable.
-                        const FRHITransitionInfo TransitionInfo(Context.RenderTarget->GetRenderTargetTexture(), ERHIAccess::Unknown, ERHIAccess::CopySrc);
-                        RHICmdList.Transition(TransitionInfo);
-                        // Then, copy our TextureTarget to another where it can be read on the CPU.
-                        // Credit for this idea to https://forums.unrealengine.com/t/lock-read-rhitexture-on-vulkan/465529
-			RHICmdList.CopyTexture(Context.RenderTarget->GetRenderTargetTexture(), Context.TextureRHICopy, FRHICopyTextureInfo());
-			// Lastly, read the raw data from the copied TextureTarget on the CPU.
-			RHICmdList.MapStagingSurface(Context.TextureRHICopy, OutBuffer, SurfaceWidth, SurfaceHeight);
-			FMemory::Memcpy(Context.Image->GetData(), OutBuffer, SurfaceWidth * SurfaceHeight * sizeof(PixelType));
-			RHICmdList.UnmapStagingSurface(Context.TextureRHICopy);
-	});
-
-	TextureRead->RenderFence.BeginFence();
-
-	return TextureRead;
-}
-
