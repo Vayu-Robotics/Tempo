@@ -60,7 +60,7 @@ void UTempoSensorServiceSubsystem::OnRenderFrameCompleted() const
 	{
 		FRHICommandListImmediate& RHICmdList = FRHICommandListImmediate::Get();
 		RHICmdList.SubmitCommandsAndFlushGPU();
-		// RHICmdList.BlockUntilGPUIdle();
+		RHICmdList.BlockUntilGPUIdle();
 
 		ForEachSensor([](ITempoSensorInterface* Sensor)
 		{
