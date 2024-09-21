@@ -28,9 +28,12 @@ public:
 
 	virtual const TArray<TEnumAsByte<EMeasurementType>>& GetMeasurementTypes() const = 0;
 
-	virtual TOptional<TFuture<void>> FlushMeasurementResponses() = 0;
+	// A sensor should override this to grab any necessary end-of-frame operations from the render thread.
+	virtual void OnFrameRenderCompleted() = 0;
 
 	virtual bool HasPendingRenderingCommands() = 0;
 
 	virtual void FlushPendingRenderingCommands() const = 0;
+
+	virtual TOptional<TFuture<void>> FlushMeasurementResponses() = 0;
 };

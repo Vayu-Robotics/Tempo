@@ -49,6 +49,9 @@ struct TTextureReadBase : FTextureRead
 	virtual void BeginRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy) override
 	{
 		FRHICommandListImmediate& RHICmdList = FRHICommandListImmediate::Get();
+		RHICmdList.ImmediateFlush(EImmediateFlushType::FlushRHIThreadFlushResources);
+		RHICmdList.ImmediateFlush(EImmediateFlushType::FlushRHIThreadFlushResources);
+		RHICmdList.SubmitCommandsAndFlushGPU();
 
 		// Then, transition our TextureTarget to be copyable.
 		RHICmdList.Transition(FRHITransitionInfo(RenderTarget->GetRenderTargetTexture(), ERHIAccess::Unknown, ERHIAccess::CopySrc));
@@ -81,17 +84,27 @@ struct TTextureRead : TTextureReadBase<PixelType>
 
 struct FTextureReadQueue
 {
-	int32 GetNumPendingTextureReads() const { return PendingTextureReads.Num(); }
+	int32 GetNumPendingTextureReads() const
+	{
+		FScopeLock Lock(&Mutex);
+		return PendingTextureReads.Num();
+	}
 	
-	bool HasOutstandingTextureReads() const { return !PendingTextureReads.IsEmpty() && !PendingTextureReads[0]->bReadCompleted; }
+	bool HasOutstandingTextureReads() const
+	{
+		FScopeLock Lock(&Mutex);
+		return !PendingTextureReads.IsEmpty() && !PendingTextureReads[0]->bReadCompleted;
+	}
 	
 	void EnqueuePendingTextureRead(FTextureRead* TextureRead)
 	{
+		FScopeLock Lock(&Mutex);
 		PendingTextureReads.Emplace(TextureRead);
 	}
 
 	void BeginNextPendingTextureRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy)
 	{
+		FScopeLock Lock(&Mutex);
 		if (!PendingTextureReads.IsEmpty())
 		{
 			PendingTextureReads[0]->BeginRead(RenderTarget, TextureRHICopy);
@@ -100,6 +113,7 @@ struct FTextureReadQueue
 
 	void SkipNextPendingTextureRead()
 	{
+		FScopeLock Lock(&Mutex);
 		if (!PendingTextureReads.IsEmpty())
 		{
 			PendingTextureReads.RemoveAt(0);
@@ -108,6 +122,7 @@ struct FTextureReadQueue
 
 	void FlushPendingTextureReads() const
 	{
+		// FScopeLock Lock(&Mutex);
 		for (const auto& PendingTextureRead : PendingTextureReads)
 		{
 			PendingTextureRead->WaitForReadCompleted();
@@ -116,6 +131,7 @@ struct FTextureReadQueue
 
 	TUniquePtr<FTextureRead> DequeuePendingTextureRead()
 	{
+		FScopeLock Lock(&Mutex);
 		if (!PendingTextureReads.IsEmpty() && PendingTextureReads[0]->bReadCompleted)
 		{
 			TUniquePtr<FTextureRead> TextureRead(PendingTextureReads[0].Release());
@@ -127,6 +143,7 @@ struct FTextureReadQueue
 
 private:
 	TArray<TUniquePtr<FTextureRead>> PendingTextureReads;
+	mutable FCriticalSection Mutex;
 };
 
 UCLASS(Abstract)
@@ -148,6 +165,8 @@ public:
 	virtual float GetRate() const override { return RateHz; }
 	
 	virtual const TArray<TEnumAsByte<EMeasurementType>>& GetMeasurementTypes() const override { return MeasurementTypes; }
+
+	virtual void OnFrameRenderCompleted() override;
 	
 	virtual bool HasPendingRenderingCommands() override { return TextureReadQueue.HasOutstandingTextureReads(); }
 	
@@ -158,8 +177,6 @@ public:
 	virtual TFuture<void> DecodeAndRespond(TUniquePtr<FTextureRead> TextureRead) PURE_VIRTUAL(UTempoSceneCaptureComponent2D::DecodeAndRespond, return TFuture<void>(); );
 
 protected:
-	void OnRenderFrameCompleted();
-
 	virtual bool HasPendingRequests() const { return false; }
 
 	UPROPERTY(VisibleAnywhere)
@@ -183,7 +200,9 @@ protected:
 	void InitRenderTarget();
 
 	FTextureReadQueue TextureReadQueue;
-	
+
+	FGPUFenceRHIRef RenderFence;
+
 private:
 	void MaybeCapture();
 

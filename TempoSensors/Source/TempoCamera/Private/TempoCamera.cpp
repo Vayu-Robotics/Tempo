@@ -50,6 +50,10 @@ void RespondToColorRequests(const TTextureRead<PixelType>* TextureRead, const TA
 		ColorImage.mutable_header()->set_sensor_name(TCHAR_TO_UTF8(*FString::Printf(TEXT("%s/%s"), *TextureRead->OwnerName, *TextureRead->SensorName)));
 	}
 
+	if (Requests.Num() > 1)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Responding to more than one request with $ %d!"), TextureRead->SequenceId);
+	}
 	TRACE_CPUPROFILER_EVENT_SCOPE(TempoCameraRespondColor);
 	for (auto ColorImageRequestIt = Requests.CreateConstIterator(); ColorImageRequestIt; ++ColorImageRequestIt)
 	{
@@ -78,6 +82,10 @@ void RespondToLabelRequests(const TTextureRead<PixelType>* TextureRead, const TA
 		LabelImage.mutable_header()->set_sensor_name(TCHAR_TO_UTF8(*FString::Printf(TEXT("%s/%s"), *TextureRead->OwnerName, *TextureRead->SensorName)));
 	}
 
+	if (Requests.Num() > 1)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Responding to more than one request with $ %d!"), TextureRead->SequenceId);
+	}
 	TRACE_CPUPROFILER_EVENT_SCOPE(TempoCameraRespondLabel);
 	for (auto LabelImageRequestIt = Requests.CreateConstIterator(); LabelImageRequestIt; ++LabelImageRequestIt)
 	{
@@ -123,6 +131,10 @@ void TTextureRead<FCameraPixelWithDepth>::RespondToRequests(const TArray<FDepthI
 		DepthImage.mutable_header()->set_sensor_name(TCHAR_TO_UTF8(*FString::Printf(TEXT("%s/%s"), *OwnerName, *SensorName)));
 	}
 
+	if (Requests.Num() > 1)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("Responding to more than one request with $ %d!"), SequenceId);
+	}
 	TRACE_CPUPROFILER_EVENT_SCOPE(TempoCameraRespondDepth);
 	for (auto DepthImageRequestIt = Requests.CreateConstIterator(); DepthImageRequestIt; ++DepthImageRequestIt)
 	{

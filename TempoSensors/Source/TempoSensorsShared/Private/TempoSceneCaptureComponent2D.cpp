@@ -6,6 +6,8 @@
 
 #include "Engine/TextureRenderTarget2D.h"
 
+// FGPUFenceRHIRef UTempoSceneCaptureComponent2D::RenderFence;
+
 UTempoSceneCaptureComponent2D::UTempoSceneCaptureComponent2D()
 {
 	PrimaryComponentTick.bStartWithTickEnabled = false;
@@ -21,12 +23,27 @@ void UTempoSceneCaptureComponent2D::BeginPlay()
 	Super::BeginPlay();
 	
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &UTempoSceneCaptureComponent2D::MaybeCapture, 1.0 / RateHz, true);
-
-	FCoreDelegates::OnEndFrameRT.AddUObject(this, &UTempoSceneCaptureComponent2D::OnRenderFrameCompleted);
 }
 
-void UTempoSceneCaptureComponent2D::OnRenderFrameCompleted()
+void UTempoSceneCaptureComponent2D::OnFrameRenderCompleted()
 {
+	// can we while(!Poll()) instead?
+	// if (!RenderFence.IsValid() || !RenderFence->Poll())
+	// {
+	// 	UE_LOG(LogTemp, Warning, TEXT("Render not complete %s num: %d sequence id: %d"), *GetName(), TextureReadQueue.GetNumPendingTextureReads(), SequenceId);
+	// 	return;
+	// }
+	if (!RenderFence.IsValid())
+	{
+		return;
+	}
+	while (!RenderFence->Poll())
+	{
+		FPlatformProcess::Sleep(1e-4);
+	}
+	RenderFence.SafeRelease();
+	
+	UE_LOG(LogTemp, Warning, TEXT("Normal OnRenderFrameCompleted %s num: %d sequence id: %d"), *GetName(), TextureReadQueue.GetNumPendingTextureReads(), SequenceId);
 	const FRenderTarget* RenderTarget = TextureTarget->GetRenderTargetResource();
 	if (!RenderTarget)
 	{
@@ -40,6 +57,7 @@ void UTempoSceneCaptureComponent2D::OnRenderFrameCompleted()
 		TextureReadQueue.SkipNextPendingTextureRead();
 		return;
 	}
+	UE_LOG(LogTemp, Warning, TEXT("BeginNextTextureRead %s num: %d sequence id: %d"), *GetName(), TextureReadQueue.GetNumPendingTextureReads(), SequenceId);
 	TextureReadQueue.BeginNextPendingTextureRead(RenderTarget, TextureRHICopy);
 }
 
@@ -57,9 +75,21 @@ FString UTempoSceneCaptureComponent2D::GetSensorName() const
 
 void UTempoSceneCaptureComponent2D::UpdateSceneCaptureContents(FSceneInterface* Scene)
 {
+	ENQUEUE_RENDER_COMMAND(SetTempoCameraRenderFence)(
+	[this](FRHICommandList& RHICmdList)
+	{
+		if (!RenderFence.IsValid())
+		{
+			RenderFence = RHICreateGPUFence(TEXT("TempoCameraRenderFence"));
+			RHICmdList.WriteGPUFence(RenderFence);
+		}
+	});
+	
 	Super::UpdateSceneCaptureContents(Scene);
-
+	
 	SequenceId++;
+
+	UE_LOG(LogTemp, Warning, TEXT("UpdateSceneCaptureContents %s sequence id: %d"), *GetName(), SequenceId);
 }
 
 void UTempoSceneCaptureComponent2D::MaybeCapture()
@@ -124,6 +154,7 @@ TOptional<TFuture<void>> UTempoSceneCaptureComponent2D::FlushMeasurementResponse
 {
 	if (TUniquePtr<FTextureRead> TextureRead = TextureReadQueue.DequeuePendingTextureRead())
 	{
+		UE_LOG(LogTemp, Warning, TEXT("DecodeAndRespond %s at sequence id: %d with sequence id: %d"), *GetName(), SequenceId, TextureRead->SequenceId);
 		return DecodeAndRespond(MoveTemp(TextureRead));
 	}
 	
@@ -132,5 +163,9 @@ TOptional<TFuture<void>> UTempoSceneCaptureComponent2D::FlushMeasurementResponse
 
 void UTempoSceneCaptureComponent2D::FlushPendingRenderingCommands() const
 {
-	TextureReadQueue.FlushPendingTextureReads();
+	if (TextureReadQueue.HasOutstandingTextureReads())
+	{
+		UE_LOG(LogTemp, Warning, TEXT("FlushPendingTextureReads %s (num: %d) sequence id: %d"), *GetName(), TextureReadQueue.GetNumPendingTextureReads(), SequenceId);
+		TextureReadQueue.FlushPendingTextureReads();
+	}
 }
