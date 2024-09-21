@@ -74,7 +74,9 @@ FString UTempoSceneCaptureComponent2D::GetSensorName() const
 }
 
 void UTempoSceneCaptureComponent2D::UpdateSceneCaptureContents(FSceneInterface* Scene)
-{
+{	
+	Super::UpdateSceneCaptureContents(Scene);
+
 	ENQUEUE_RENDER_COMMAND(SetTempoCameraRenderFence)(
 	[this](FRHICommandList& RHICmdList)
 	{
@@ -84,8 +86,6 @@ void UTempoSceneCaptureComponent2D::UpdateSceneCaptureContents(FSceneInterface* 
 			RHICmdList.WriteGPUFence(RenderFence);
 		}
 	});
-	
-	Super::UpdateSceneCaptureContents(Scene);
 	
 	SequenceId++;
 
