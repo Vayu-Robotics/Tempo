@@ -311,7 +311,7 @@ void UTempoCamera::ApplyDepthEnabled()
 
 	InitRenderTarget();
 	// Should we only ApplyDepthEnabled at the end of a render frame?
-	TextureReadQueue.Empty();
+	// TextureReadQueue.Empty();
 }
 
 TFuture<void> UTempoCamera::DecodeAndRespond(TUniquePtr<FTextureRead> TextureRead)

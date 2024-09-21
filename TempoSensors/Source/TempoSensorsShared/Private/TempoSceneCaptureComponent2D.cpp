@@ -32,20 +32,21 @@ void UTempoSceneCaptureComponent2D::OnFrameRenderCompleted(bool bBlock)
 		return;
 	}
 
-	// if (bBlock)
-	// {
-	// 	while (!RenderFence->Poll())
-	// 	{
-	// 		FPlatformProcess::Sleep(1e-4);
-	// 	}
-	// }
-	if (!RenderFence->Poll())
+	if (bBlock)
+	{
+		while (!RenderFence->Poll())
+		{
+			FPlatformProcess::Sleep(1e-4);
+		}
+	}
+	else if (!RenderFence->Poll())
 	{
 		return;
 	}
 
 	RenderFence.SafeRelease();
-	
+
+	// These should be ensures or something
 	const FRenderTarget* RenderTarget = TextureTarget->GetRenderTargetResource();
 	if (!RenderTarget)
 	{
@@ -60,7 +61,6 @@ void UTempoSceneCaptureComponent2D::OnFrameRenderCompleted(bool bBlock)
 		return;
 	}
 
-	UE_LOG(LogTemp, Warning, TEXT("Reading at %lu"), GFrameCounterRenderThread);
 	TextureReadQueue.BeginNextPendingTextureRead(RenderTarget, TextureRHICopy);
 }
 
@@ -78,8 +78,9 @@ FString UTempoSceneCaptureComponent2D::GetSensorName() const
 
 void UTempoSceneCaptureComponent2D::UpdateSceneCaptureContents(FSceneInterface* Scene)
 {
-	TextureCreationFence.Wait();
+	TextureInitFence.Wait();
 
+	// These should be ensures or something
 	const FTextureRenderTargetResource* RenderTarget = TextureTarget->GameThread_GetRenderTargetResource();
 	if (!RenderTarget || !RenderTarget->IsInitialized())
 	{
@@ -106,7 +107,6 @@ void UTempoSceneCaptureComponent2D::UpdateSceneCaptureContents(FSceneInterface* 
 	{
 		if (!RenderFence.IsValid())
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Inserting render fence at %lu"), GFrameCounterRenderThread);
 			RenderFence = RHICreateGPUFence(TEXT("TempoCameraRenderFence"));
 			RHICmdList.WriteGPUFence(RenderFence);
 		}
@@ -172,11 +172,9 @@ void UTempoSceneCaptureComponent2D::InitRenderTarget()
 				.SetFlags(TexCreateFlags);
 
 			*Context.TextureRHICopy = RHICreateTexture(Desc);
-
-			UE_LOG(LogTemp, Warning, TEXT("Created teture copy"));
 		});
 
-	TextureCreationFence.BeginFence();
+	TextureInitFence.BeginFence();
 }
 
 TOptional<TFuture<void>> UTempoSceneCaptureComponent2D::FlushMeasurementResponses()

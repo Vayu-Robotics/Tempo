@@ -127,6 +127,7 @@ struct FTextureReadQueue
 
 	void FlushPendingTextureReads() const
 	{
+		// Is this safe?
 		// FScopeLock Lock(&Mutex);
 		for (const auto& PendingTextureRead : PendingTextureReads)
 		{
@@ -208,14 +209,15 @@ protected:
 	
 	void InitRenderTarget();
 
+
+private:
+	void MaybeCapture();
+
 	FTextureReadQueue TextureReadQueue;
 
 	FGPUFenceRHIRef RenderFence;
 
-	FRenderCommandFence TextureCreationFence;
-
-private:
-	void MaybeCapture();
+	FRenderCommandFence TextureInitFence;
 
 	// We must copy our TextureTarget's resource here before reading it on the CPU.
 	FTextureRHIRef TextureRHICopy;
