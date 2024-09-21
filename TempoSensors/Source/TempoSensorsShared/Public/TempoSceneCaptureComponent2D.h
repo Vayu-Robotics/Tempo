@@ -171,10 +171,14 @@ public:
 
 	virtual TOptional<TFuture<void>> FlushMeasurementResponses() override;
 
-	virtual TFuture<void> DecodeAndRespond(TUniquePtr<FTextureRead> TextureRead) PURE_VIRTUAL(UTempoSceneCaptureComponent2D::DecodeAndRespond, return TFuture<void>(); );
-
 protected:
 	virtual bool HasPendingRequests() const { return false; }
+
+	virtual FTextureRead* MakeTextureRead() const PURE_VIRTUAL(UTempoSceneCaptureComponent2D::MakeTextureRead, return nullptr; );
+
+	virtual TFuture<void> DecodeAndRespond(TUniquePtr<FTextureRead> TextureRead) PURE_VIRTUAL(UTempoSceneCaptureComponent2D::DecodeAndRespond, return TFuture<void>(); );
+
+	virtual int32 GetMaxTextureQueueSize() const PURE_VIRTUAL(UTempoSceneCaptureComponent2D::GetMaxTextureQueueSize, return 0; );
 
 	UPROPERTY(VisibleAnywhere)
 	TEnumAsByte<ETextureRenderTargetFormat> RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;

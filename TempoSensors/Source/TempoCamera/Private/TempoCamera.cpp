@@ -169,21 +169,23 @@ void UTempoCamera::UpdateSceneCaptureContents(FSceneInterface* Scene)
 	{
 		// If no client is requesting depth, stop rendering it.
 		SetDepthEnabled(false);
-		// return;
 	}
 
 	Super::UpdateSceneCaptureContents(Scene);
-	
-	if (TextureReadQueue.GetNumPendingTextureReads() > GetDefault<UTempoSensorsSettings>()->GetMaxCameraRenderBufferSize())
-	{
-		UE_LOG(LogTempoCamera, Warning, TEXT("Fell behind while rendering images from camera %s owner %s. Dropping image."), *GetSensorName(), *GetOwnerName());
-		return;
-	}
+}
 
+FTextureRead* UTempoCamera::MakeTextureRead() const
+{
 	check(GetWorld());
-	TextureReadQueue.EnqueuePendingTextureRead(bDepthEnabled ?
+
+	return bDepthEnabled ?
 		static_cast<FTextureRead*>(new TTextureRead<FCameraPixelWithDepth>(SizeXY, SequenceId, GetWorld()->GetTimeSeconds(), GetOwnerName(), GetSensorName(), MinDepth, MaxDepth)):
-		static_cast<FTextureRead*>(new TTextureRead<FCameraPixelNoDepth>(SizeXY, SequenceId, GetWorld()->GetTimeSeconds(), GetOwnerName(), GetSensorName())));
+		static_cast<FTextureRead*>(new TTextureRead<FCameraPixelNoDepth>(SizeXY, SequenceId, GetWorld()->GetTimeSeconds(), GetOwnerName(), GetSensorName()));
+}
+
+int32 UTempoCamera::GetMaxTextureQueueSize() const
+{
+	return GetDefault<UTempoSensorsSettings>()->GetMaxCameraRenderBufferSize();
 }
 
 void UTempoCamera::RequestMeasurement(const TempoCamera::ColorImageRequest& Request, const TResponseDelegate<TempoCamera::ColorImage>& ResponseContinuation)

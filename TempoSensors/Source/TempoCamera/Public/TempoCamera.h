@@ -165,9 +165,13 @@ protected:
 
 	UPROPERTY(VisibleAnywhere)
 	UMaterialInstanceDynamic* PostProcessMaterialInstance= nullptr;
+
+	virtual FTextureRead* MakeTextureRead() const override;
 	
 	// Decode the underlying pixel data into responses and send them.
 	virtual TFuture<void> DecodeAndRespond(TUniquePtr<FTextureRead> TextureRead) override;
+
+	virtual int32 GetMaxTextureQueueSize() const override;
 
 	TArray<FColorImageRequest> PendingColorImageRequests;
 	TArray<FLabelImageRequest> PendingLabelImageRequests;
