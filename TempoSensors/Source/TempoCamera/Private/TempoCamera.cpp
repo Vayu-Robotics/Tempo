@@ -6,8 +6,9 @@
 
 #include "TempoSensorsSettings.h"
 
-#include "Engine/TextureRenderTarget2D.h"
 #include "TempoLabelTypes.h"
+
+#include "Engine/TextureRenderTarget2D.h"
 
 namespace
 {
@@ -18,14 +19,9 @@ namespace
 
 FTempoCameraIntrinsics::FTempoCameraIntrinsics(const FIntPoint& SizeXY, float HorizontalFOV)
 	: Fx(SizeXY.X / 2.0 / FMath::Tan(FMath::DegreesToRadians(HorizontalFOV) / 2.0)),
-      Fy(Fx), // Fx == Fy means the sensor's pixels are square, not that the FOV is symmetric.
-      Cx(SizeXY.X / 2.0),
-      Cy(SizeXY.Y / 2.0) {}
-
-FTempoCameraIntrinsics UTempoCamera::GetIntrinsics() const
-{
-	return FTempoCameraIntrinsics(SizeXY, FOVAngle);
-}
+	  Fy(Fx), // Fx == Fy means the sensor's pixels are square, not that the FOV is symmetric.
+	  Cx(SizeXY.X / 2.0),
+	  Cy(SizeXY.Y / 2.0) {}
 
 template <typename PixelType>
 void RespondToColorRequests(const TTextureRead<PixelType>* TextureRead, const TArray<FColorImageRequest>& Requests, float TransmissionTime)
@@ -50,10 +46,6 @@ void RespondToColorRequests(const TTextureRead<PixelType>* TextureRead, const TA
 		ColorImage.mutable_header()->set_sensor_name(TCHAR_TO_UTF8(*FString::Printf(TEXT("%s/%s"), *TextureRead->OwnerName, *TextureRead->SensorName)));
 	}
 
-	if (Requests.Num() > 1)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Responding to more than one request with $ %d!"), TextureRead->SequenceId);
-	}
 	TRACE_CPUPROFILER_EVENT_SCOPE(TempoCameraRespondColor);
 	for (auto ColorImageRequestIt = Requests.CreateConstIterator(); ColorImageRequestIt; ++ColorImageRequestIt)
 	{
@@ -82,10 +74,6 @@ void RespondToLabelRequests(const TTextureRead<PixelType>* TextureRead, const TA
 		LabelImage.mutable_header()->set_sensor_name(TCHAR_TO_UTF8(*FString::Printf(TEXT("%s/%s"), *TextureRead->OwnerName, *TextureRead->SensorName)));
 	}
 
-	if (Requests.Num() > 1)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Responding to more than one request with $ %d!"), TextureRead->SequenceId);
-	}
 	TRACE_CPUPROFILER_EVENT_SCOPE(TempoCameraRespondLabel);
 	for (auto LabelImageRequestIt = Requests.CreateConstIterator(); LabelImageRequestIt; ++LabelImageRequestIt)
 	{
@@ -93,27 +81,27 @@ void RespondToLabelRequests(const TTextureRead<PixelType>* TextureRead, const TA
 	}
 }
 
-void TTextureRead<FCameraPixelNoDepth>::RespondToRequests(const TArray<FColorImageRequest>& Requests, float TransmissionTime)
+void TTextureRead<FCameraPixelNoDepth>::RespondToRequests(const TArray<FColorImageRequest>& Requests, float TransmissionTime) const
 {
 	RespondToColorRequests(this, Requests, TransmissionTime);
 }
 
-void TTextureRead<FCameraPixelNoDepth>::RespondToRequests(const TArray<FLabelImageRequest>& Requests, float TransmissionTime)
+void TTextureRead<FCameraPixelNoDepth>::RespondToRequests(const TArray<FLabelImageRequest>& Requests, float TransmissionTime) const
 {
 	RespondToLabelRequests(this, Requests, TransmissionTime);
 }
 
-void TTextureRead<FCameraPixelWithDepth>::RespondToRequests(const TArray<FColorImageRequest>& Requests, float TransmissionTime)
+void TTextureRead<FCameraPixelWithDepth>::RespondToRequests(const TArray<FColorImageRequest>& Requests, float TransmissionTime) const
 {
 	RespondToColorRequests(this, Requests, TransmissionTime);
 }
 
-void TTextureRead<FCameraPixelWithDepth>::RespondToRequests(const TArray<FLabelImageRequest>& Requests, float TransmissionTime)
+void TTextureRead<FCameraPixelWithDepth>::RespondToRequests(const TArray<FLabelImageRequest>& Requests, float TransmissionTime) const
 {
 	RespondToLabelRequests(this, Requests, TransmissionTime);
 }
 
-void TTextureRead<FCameraPixelWithDepth>::RespondToRequests(const TArray<FDepthImageRequest>& Requests, float TransmissionTime)
+void TTextureRead<FCameraPixelWithDepth>::RespondToRequests(const TArray<FDepthImageRequest>& Requests, float TransmissionTime) const
 {
 	TempoCamera::DepthImage DepthImage;
 	{
@@ -131,10 +119,6 @@ void TTextureRead<FCameraPixelWithDepth>::RespondToRequests(const TArray<FDepthI
 		DepthImage.mutable_header()->set_sensor_name(TCHAR_TO_UTF8(*FString::Printf(TEXT("%s/%s"), *OwnerName, *SensorName)));
 	}
 
-	if (Requests.Num() > 1)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("Responding to more than one request with $ %d!"), SequenceId);
-	}
 	TRACE_CPUPROFILER_EVENT_SCOPE(TempoCameraRespondDepth);
 	for (auto DepthImageRequestIt = Requests.CreateConstIterator(); DepthImageRequestIt; ++DepthImageRequestIt)
 	{
@@ -154,7 +138,7 @@ UTempoCamera::UTempoCamera()
 	ShowFlags.SetTemporalAA(true);
 	ShowFlags.SetMotionBlur(false);
 
-	// No depth settings
+	// Start with no-depth settings
 	RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8; // Corresponds to PF_B8G8R8A8
 	PixelFormatOverride = EPixelFormat::PF_Unknown;
 }
@@ -183,20 +167,6 @@ void UTempoCamera::UpdateSceneCaptureContents(FSceneInterface* Scene)
 	Super::UpdateSceneCaptureContents(Scene);
 }
 
-FTextureRead* UTempoCamera::MakeTextureRead() const
-{
-	check(GetWorld());
-
-	return bDepthEnabled ?
-		static_cast<FTextureRead*>(new TTextureRead<FCameraPixelWithDepth>(SizeXY, SequenceId, GetWorld()->GetTimeSeconds(), GetOwnerName(), GetSensorName(), MinDepth, MaxDepth)):
-		static_cast<FTextureRead*>(new TTextureRead<FCameraPixelNoDepth>(SizeXY, SequenceId, GetWorld()->GetTimeSeconds(), GetOwnerName(), GetSensorName()));
-}
-
-int32 UTempoCamera::GetMaxTextureQueueSize() const
-{
-	return GetDefault<UTempoSensorsSettings>()->GetMaxCameraRenderBufferSize();
-}
-
 void UTempoCamera::RequestMeasurement(const TempoCamera::ColorImageRequest& Request, const TResponseDelegate<TempoCamera::ColorImage>& ResponseContinuation)
 {
 	PendingColorImageRequests.Add({ Request, ResponseContinuation});
@@ -210,6 +180,69 @@ void UTempoCamera::RequestMeasurement(const TempoCamera::LabelImageRequest& Requ
 void UTempoCamera::RequestMeasurement(const TempoCamera::DepthImageRequest& Request, const TResponseDelegate<TempoCamera::DepthImage>& ResponseContinuation)
 {
 	PendingDepthImageRequests.Add({ Request, ResponseContinuation});
+}
+
+FTempoCameraIntrinsics UTempoCamera::GetIntrinsics() const
+{
+	return FTempoCameraIntrinsics(SizeXY, FOVAngle);
+}
+
+bool UTempoCamera::HasPendingRequests() const
+{
+	return !PendingColorImageRequests.IsEmpty() || !PendingLabelImageRequests.IsEmpty() || !PendingDepthImageRequests.IsEmpty();
+}
+
+FTextureRead* UTempoCamera::MakeTextureRead() const
+{
+	check(GetWorld());
+
+	return bDepthEnabled ?
+		static_cast<FTextureRead*>(new TTextureRead<FCameraPixelWithDepth>(SizeXY, SequenceId, GetWorld()->GetTimeSeconds(), GetOwnerName(), GetSensorName(), MinDepth, MaxDepth)):
+		static_cast<FTextureRead*>(new TTextureRead<FCameraPixelNoDepth>(SizeXY, SequenceId, GetWorld()->GetTimeSeconds(), GetOwnerName(), GetSensorName()));
+}
+
+TFuture<void> UTempoCamera::DecodeAndRespond(TUniquePtr<FTextureRead> TextureRead)
+{
+	const double TransmissionTime = GetWorld()->GetTimeSeconds();
+
+	const bool bSupportsDepth = TextureRead->GetType() == TEXT("WithDepth");
+
+	TFuture<void> Future = Async(EAsyncExecution::TaskGraph, [
+		TextureRead = MoveTemp(TextureRead),
+		ColorImageRequests = PendingColorImageRequests,
+		LabelImageRequests = PendingLabelImageRequests,
+		DepthImageRequests = PendingDepthImageRequests,
+		TransmissionTimeCpy = TransmissionTime
+		]
+	{
+		TRACE_CPUPROFILER_EVENT_SCOPE(TempoCameraDecodeAndRespond);
+
+		if (TextureRead->GetType() == TEXT("WithDepth"))
+		{
+			static_cast<TTextureRead<FCameraPixelWithDepth>*>(TextureRead.Get())->RespondToRequests(ColorImageRequests, TransmissionTimeCpy);
+			static_cast<TTextureRead<FCameraPixelWithDepth>*>(TextureRead.Get())->RespondToRequests(LabelImageRequests, TransmissionTimeCpy);
+			static_cast<TTextureRead<FCameraPixelWithDepth>*>(TextureRead.Get())->RespondToRequests(DepthImageRequests, TransmissionTimeCpy);
+		}
+		else if (TextureRead->GetType() == TEXT("NoDepth"))
+		{
+			static_cast<TTextureRead<FCameraPixelNoDepth>*>(TextureRead.Get())->RespondToRequests(ColorImageRequests, TransmissionTimeCpy);
+			static_cast<TTextureRead<FCameraPixelNoDepth>*>(TextureRead.Get())->RespondToRequests(LabelImageRequests, TransmissionTimeCpy);
+		}
+	});
+
+	PendingColorImageRequests.Empty();
+	PendingLabelImageRequests.Empty();
+	if (bSupportsDepth)
+	{
+		PendingDepthImageRequests.Empty();
+	}
+	
+	return Future;
+}
+
+int32 UTempoCamera::GetMaxTextureQueueSize() const
+{
+	return GetDefault<UTempoSensorsSettings>()->GetMaxCameraRenderBufferSize();
 }
 
 void UTempoCamera::SetDepthEnabled(bool bDepthEnabledIn)
@@ -310,45 +343,4 @@ void UTempoCamera::ApplyDepthEnabled()
 	}
 
 	InitRenderTarget();
-	// Should we only ApplyDepthEnabled at the end of a render frame?
-	// TextureReadQueue.Empty();
-}
-
-TFuture<void> UTempoCamera::DecodeAndRespond(TUniquePtr<FTextureRead> TextureRead)
-{
-	const double TransmissionTime = GetWorld()->GetTimeSeconds();
-
-	const bool bSupportsDepth = TextureRead->GetType() == TEXT("WithDepth");
-
-	TFuture<void> Future = Async(EAsyncExecution::TaskGraph, [
-		TextureRead = MoveTemp(TextureRead),
-		ColorImageRequests = PendingColorImageRequests,
-		LabelImageRequests = PendingLabelImageRequests,
-		DepthImageRequests = PendingDepthImageRequests,
-		TransmissionTimeCpy = TransmissionTime
-		]
-	{
-		TRACE_CPUPROFILER_EVENT_SCOPE(TempoCameraDecodeAndRespond);
-
-		if (TextureRead->GetType() == TEXT("WithDepth"))
-		{
-			static_cast<TTextureRead<FCameraPixelWithDepth>*>(TextureRead.Get())->RespondToRequests(ColorImageRequests, TransmissionTimeCpy);
-			static_cast<TTextureRead<FCameraPixelWithDepth>*>(TextureRead.Get())->RespondToRequests(LabelImageRequests, TransmissionTimeCpy);
-			static_cast<TTextureRead<FCameraPixelWithDepth>*>(TextureRead.Get())->RespondToRequests(DepthImageRequests, TransmissionTimeCpy);
-		}
-		else if (TextureRead->GetType() == TEXT("NoDepth"))
-		{
-			static_cast<TTextureRead<FCameraPixelNoDepth>*>(TextureRead.Get())->RespondToRequests(ColorImageRequests, TransmissionTimeCpy);
-			static_cast<TTextureRead<FCameraPixelNoDepth>*>(TextureRead.Get())->RespondToRequests(LabelImageRequests, TransmissionTimeCpy);
-		}
-	});
-
-	PendingColorImageRequests.Empty();
-	PendingLabelImageRequests.Empty();
-	if (bSupportsDepth)
-	{
-		PendingDepthImageRequests.Empty();
-	}
-	
-	return Future;
 }

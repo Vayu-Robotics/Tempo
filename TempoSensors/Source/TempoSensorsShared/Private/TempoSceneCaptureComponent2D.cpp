@@ -5,6 +5,8 @@
 #include "TempoSensorsSettings.h"
 #include "TempoSensorsShared.h"
 
+#include "TempoCoreSettings.h"
+
 #include "Engine/TextureRenderTarget2D.h"
 
 UTempoSceneCaptureComponent2D::UTempoSceneCaptureComponent2D()
@@ -21,80 +23,24 @@ UTempoSceneCaptureComponent2D::UTempoSceneCaptureComponent2D()
 void UTempoSceneCaptureComponent2D::BeginPlay()
 {
 	Super::BeginPlay();
-	
+
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &UTempoSceneCaptureComponent2D::MaybeCapture, 1.0 / RateHz, true);
-}
-
-void UTempoSceneCaptureComponent2D::OnFrameRenderCompleted(bool bBlock)
-{
-	if (!TextureReadQueue.HasOutstandingTextureReads() || !RenderFence.IsValid())
-	{
-		return;
-	}
-
-	if (bBlock)
-	{
-		while (!RenderFence->Poll())
-		{
-			FPlatformProcess::Sleep(1e-4);
-		}
-	}
-	else if (!RenderFence->Poll())
-	{
-		return;
-	}
-
-	RenderFence.SafeRelease();
-
-	// These should be ensures or something
-	const FRenderTarget* RenderTarget = TextureTarget->GetRenderTargetResource();
-	if (!RenderTarget)
-	{
-		UE_LOG(LogTempoSensorsShared, Warning, TEXT("RenderTarget was not initialized. Skipping texture read."));
-		TextureReadQueue.SkipNextPendingTextureRead();
-		return;
-	}
-	if (!TextureRHICopy.IsValid() || !TextureRHICopy->IsValid() || TextureRHICopy->GetFormat() != TextureTarget->GetFormat())
-	{
-		UE_LOG(LogTempoSensorsShared, Warning, TEXT("TextureRHICopy was not valid. Skipping texture read."));
-		TextureReadQueue.SkipNextPendingTextureRead();
-		return;
-	}
-
-	TextureReadQueue.BeginNextPendingTextureRead(RenderTarget, TextureRHICopy);
-}
-
-FString UTempoSceneCaptureComponent2D::GetOwnerName() const
-{
-	check(GetOwner());
-
-	return GetOwner()->GetActorNameOrLabel();
-}
-
-FString UTempoSceneCaptureComponent2D::GetSensorName() const
-{
-	return GetName();
 }
 
 void UTempoSceneCaptureComponent2D::UpdateSceneCaptureContents(FSceneInterface* Scene)
 {
 	TextureInitFence.Wait();
 
-	// These should be ensures or something
 	const FTextureRenderTargetResource* RenderTarget = TextureTarget->GameThread_GetRenderTargetResource();
-	if (!RenderTarget || !RenderTarget->IsInitialized())
+	if (!ensureMsgf(RenderTarget && RenderTarget->IsInitialized(), TEXT("RenderTarget was not initialized. Skipping capture.")) ||
+		!ensureMsgf(TextureRHICopy.IsValid() && TextureRHICopy->IsValid(), TEXT("TextureRHICopy was not valid. Skipping capture.")) ||
+		!ensureMsgf(TextureRHICopy->GetFormat() == TextureTarget->GetFormat(), TEXT("RenderTarget and TextureRHICopy did not have same format. Skipping Capture.")))
 	{
-		UE_LOG(LogTempoSensorsShared, Warning, TEXT("RenderTarget was not initialized. Skipping capture."));
-		return;
-	}
-	if (!TextureRHICopy.IsValid() || !TextureRHICopy->IsValid() || TextureRHICopy->GetFormat() != TextureTarget->GetFormat())
-	{
-		UE_LOG(LogTempoSensorsShared, Warning, TEXT("TextureRHICopy was not valid. Skipping capture."));
 		return;
 	}
 
-	// TODO: REMOVE THIS
-	if (TextureReadQueue.GetNumPendingTextureReads() > GetMaxTextureQueueSize())
+	const int32 MaxTextureQueueSize = GetMaxTextureQueueSize();
+	if (MaxTextureQueueSize > 0 && TextureReadQueue.GetNum() > MaxTextureQueueSize)
 	{
 		UE_LOG(LogTempoSensorsShared, Warning, TEXT("Fell behind while reading frames from sensor %s owner %s. Skipping capture."), *GetSensorName(), *GetOwnerName());
 		return;
@@ -114,17 +60,72 @@ void UTempoSceneCaptureComponent2D::UpdateSceneCaptureContents(FSceneInterface* 
 	
 	SequenceId++;
 
-	TextureReadQueue.EnqueuePendingTextureRead(MakeTextureRead());
+	TextureReadQueue.Enqueue(MakeTextureRead());
 }
 
-void UTempoSceneCaptureComponent2D::MaybeCapture()
+FString UTempoSceneCaptureComponent2D::GetOwnerName() const
 {
-	if (!HasPendingRequests())
+	check(GetOwner());
+
+	return GetOwner()->GetActorNameOrLabel();
+}
+
+FString UTempoSceneCaptureComponent2D::GetSensorName() const
+{
+	return GetName();
+}
+
+bool UTempoSceneCaptureComponent2D::IsAwaitingRender()
+{
+	return TextureReadQueue.IsNextAwaitingRender();
+}
+
+void UTempoSceneCaptureComponent2D::OnRenderCompleted()
+{
+	if (!TextureReadQueue.IsNextAwaitingRender() || !ensureMsgf(RenderFence.IsValid(), TEXT("Render fence is missing in ")))
 	{
 		return;
 	}
 
-	CaptureSceneDeferred();
+	if (GetDefault<UTempoCoreSettings>()->GetTimeMode() == ETimeMode::FixedStep)
+	{
+		while (!RenderFence->Poll())
+		{
+			FPlatformProcess::Sleep(1e-4);
+		}
+	}
+	else if (!RenderFence->Poll())
+	{
+		return;
+	}
+
+	RenderFence.SafeRelease();
+
+	const FRenderTarget* RenderTarget = TextureTarget->GetRenderTargetResource();
+	if (!ensureMsgf(RenderTarget, TEXT("RenderTarget was not initialized. Skipping texture read.")) ||
+		!ensureMsgf(TextureRHICopy.IsValid() && TextureRHICopy->IsValid(), TEXT("TextureRHICopy was not valid. Skipping texture read.")) ||
+		!ensureMsgf(TextureRHICopy->GetFormat() == TextureTarget->GetFormat(), TEXT("RenderTarget and TextureRHICopy did not have same format. Skipping texture read.")))
+	{
+		TextureReadQueue.SkipNext();
+		return;
+	}
+
+	TextureReadQueue.BeginNextRead(RenderTarget, TextureRHICopy);
+}
+
+void UTempoSceneCaptureComponent2D::BlockUntilMeasurementsReady() const
+{
+	TextureReadQueue.BlockUntilNextReadyToSend();
+}
+
+TOptional<TFuture<void>> UTempoSceneCaptureComponent2D::SendMeasurements()
+{
+	if (TUniquePtr<FTextureRead> TextureRead = TextureReadQueue.DequeueIfReadyToSend())
+	{
+		return DecodeAndRespond(MoveTemp(TextureRead));
+	}
+	
+	return TOptional<TFuture<void>>();
 }
 
 void UTempoSceneCaptureComponent2D::InitRenderTarget()
@@ -177,17 +178,12 @@ void UTempoSceneCaptureComponent2D::InitRenderTarget()
 	TextureInitFence.BeginFence();
 }
 
-TOptional<TFuture<void>> UTempoSceneCaptureComponent2D::FlushMeasurementResponses()
+void UTempoSceneCaptureComponent2D::MaybeCapture()
 {
-	if (TUniquePtr<FTextureRead> TextureRead = TextureReadQueue.DequeuePendingTextureRead())
+	if (!HasPendingRequests())
 	{
-		return DecodeAndRespond(MoveTemp(TextureRead));
+		return;
 	}
-	
-	return TOptional<TFuture<void>>();
-}
 
-void UTempoSceneCaptureComponent2D::FlushPendingRenderingCommands() const
-{
-	TextureReadQueue.FlushPendingTextureReads();
+	CaptureSceneDeferred();
 }

@@ -12,18 +12,25 @@
 
 struct FTextureRead
 {
+	enum class State : uint8
+	{
+		EAwaitingRender = 0,
+		EReading = 1,
+		EReadyToSend = 2
+	};
+	
 	FTextureRead(const FIntPoint& ImageSizeIn, int32 SequenceIdIn, double CaptureTimeIn, const FString& OwnerNameIn, const FString& SensorNameIn)
-		: ImageSize(ImageSizeIn), SequenceId(SequenceIdIn), CaptureTime(CaptureTimeIn), OwnerName(OwnerNameIn), SensorName(SensorNameIn) {}
+		: ImageSize(ImageSizeIn), SequenceId(SequenceIdIn), CaptureTime(CaptureTimeIn), OwnerName(OwnerNameIn), SensorName(SensorNameIn), State(State::EAwaitingRender) {}
 
 	virtual ~FTextureRead() {}
 
-	virtual void BeginRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy) = 0;
-
 	virtual FName GetType() const = 0;
 
-	void WaitForReadCompleted() const
+	virtual void BeginRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy) = 0;
+
+	void BlockUntilReadyToSend() const
 	{
-		while (!bReadCompleted)
+		while (State != State::EReadyToSend)
 		{
 			FPlatformProcess::Sleep(1e-4);
 		}
@@ -34,7 +41,7 @@ struct FTextureRead
 	double CaptureTime;
 	const FString OwnerName;
 	const FString SensorName;
-	TAtomic<bool> bReadCompleted = false;
+	TAtomic<State> State;
 };
 
 template <typename PixelType>
@@ -48,7 +55,7 @@ struct TTextureReadBase : FTextureRead
 
 	virtual void BeginRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy) override
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Beginning texture read %s"), *GetType().ToString());
+		State = State::EReading;
 
 		FRHICommandListImmediate& RHICmdList = FRHICommandListImmediate::Get();
 
@@ -69,7 +76,7 @@ struct TTextureReadBase : FTextureRead
 		FMemory::Memcpy(Image.GetData(), OutBuffer, SurfaceWidth * SurfaceHeight * sizeof(PixelType));
 		RHICmdList.UnmapStagingSurface(TextureRHICopy);
 		
-		bReadCompleted = true;
+		State = State::EReadyToSend;
 	}
 	
 	TArray<PixelType> Image;
@@ -83,40 +90,35 @@ struct TTextureRead : TTextureReadBase<PixelType>
 
 struct FTextureReadQueue
 {
-	int32 GetNumPendingTextureReads() const
+	int32 GetNum() const
 	{
 		FScopeLock Lock(&Mutex);
 		return PendingTextureReads.Num();
 	}
 	
-	bool HasOutstandingTextureReads() const
-	{
-		FScopeLock Lock(&Mutex);
-		return !PendingTextureReads.IsEmpty() && !PendingTextureReads[0]->bReadCompleted;
-	}
-	
-	void EnqueuePendingTextureRead(FTextureRead* TextureRead)
+	void Enqueue(FTextureRead* TextureRead)
 	{
 		FScopeLock Lock(&Mutex);
 		PendingTextureReads.Emplace(TextureRead);
 	}
 
-	void Empty()
+	bool IsNextAwaitingRender() const
 	{
 		FScopeLock Lock(&Mutex);
-		PendingTextureReads.Empty();
+		return !PendingTextureReads.IsEmpty() && PendingTextureReads[0]->State == FTextureRead::State::EAwaitingRender;
 	}
 
-	void BeginNextPendingTextureRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy)
+	void BeginNextRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy)
 	{
 		FScopeLock Lock(&Mutex);
 		if (!PendingTextureReads.IsEmpty())
 		{
+			check(PendingTextureReads[0]->State == FTextureRead::State::EAwaitingRender);
 			PendingTextureReads[0]->BeginRead(RenderTarget, TextureRHICopy);
 		}
 	}
 
-	void SkipNextPendingTextureRead()
+	void SkipNext()
 	{
 		FScopeLock Lock(&Mutex);
 		if (!PendingTextureReads.IsEmpty())
@@ -125,20 +127,20 @@ struct FTextureReadQueue
 		}
 	}
 
-	void FlushPendingTextureReads() const
+	void BlockUntilNextReadyToSend() const
 	{
 		// Is this safe?
 		// FScopeLock Lock(&Mutex);
-		for (const auto& PendingTextureRead : PendingTextureReads)
+		if (!PendingTextureReads.IsEmpty())
 		{
-			PendingTextureRead->WaitForReadCompleted();
+			PendingTextureReads[0]->BlockUntilReadyToSend();
 		}
 	}
 
-	TUniquePtr<FTextureRead> DequeuePendingTextureRead()
+	TUniquePtr<FTextureRead> DequeueIfReadyToSend()
 	{
 		FScopeLock Lock(&Mutex);
-		if (!PendingTextureReads.IsEmpty() && PendingTextureReads[0]->bReadCompleted)
+		if (!PendingTextureReads.IsEmpty() && PendingTextureReads[0]->State == FTextureRead::State::EReadyToSend)
 		{
 			TUniquePtr<FTextureRead> TextureRead(PendingTextureReads[0].Release());
 			PendingTextureReads.RemoveAt(0);
@@ -164,62 +166,72 @@ public:
 
 	virtual void UpdateSceneCaptureContents(FSceneInterface* Scene) override;
 
+	// Begin ITempoSensorInterface
 	virtual FString GetOwnerName() const override;
-
 	virtual FString GetSensorName() const override;
-
 	virtual float GetRate() const override { return RateHz; }
-	
 	virtual const TArray<TEnumAsByte<EMeasurementType>>& GetMeasurementTypes() const override { return MeasurementTypes; }
-
-	virtual void OnFrameRenderCompleted(bool bBlock) override;
-	
-	virtual bool HasPendingRenderingCommands() override { return TextureReadQueue.HasOutstandingTextureReads(); }
-	
-	virtual void FlushPendingRenderingCommands() const override;
-
-	virtual TOptional<TFuture<void>> FlushMeasurementResponses() override;
+	virtual bool IsAwaitingRender() override;
+	virtual void OnRenderCompleted() override;
+	virtual void BlockUntilMeasurementsReady() const override;
+	virtual TOptional<TFuture<void>> SendMeasurements() override;
+	// End ITempoSensorInterface
 
 protected:
-	virtual bool HasPendingRequests() const { return false; }
+	// Derived components must override this to return whether they have pending requests.
+	virtual bool HasPendingRequests() const PURE_VIRTUAL(UTempoSceneCaptureComponent2D::HasPendingRequests, return false; );
 
+	// Derived components must override this to create new texture reads, based on their current settings, to be enqueued.
 	virtual FTextureRead* MakeTextureRead() const PURE_VIRTUAL(UTempoSceneCaptureComponent2D::MakeTextureRead, return nullptr; );
 
+	// Derived components must override this to decode a completed texture read and use it to respond to pending requests.
 	virtual TFuture<void> DecodeAndRespond(TUniquePtr<FTextureRead> TextureRead) PURE_VIRTUAL(UTempoSceneCaptureComponent2D::DecodeAndRespond, return TFuture<void>(); );
 
-	virtual int32 GetMaxTextureQueueSize() const PURE_VIRTUAL(UTempoSceneCaptureComponent2D::GetMaxTextureQueueSize, return 0; );
+	// Derived components may override this to limit the size of the texture queue.
+	virtual int32 GetMaxTextureQueueSize() const { return -1; }
 
+	// Derived components may set this to use a non-default render target format.
 	UPROPERTY(VisibleAnywhere)
 	TEnumAsByte<ETextureRenderTargetFormat> RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8;
 
+	// Derived components may set this to use a non-default pixel format.
 	UPROPERTY(VisibleAnywhere)
 	TEnumAsByte<EPixelFormat> PixelFormatOverride = EPixelFormat::PF_Unknown;
-	
+
+	// The rate in Hz this sensor updates at.
 	UPROPERTY(EditAnywhere)
 	float RateHz = 10.0;
 
+	// The measurement types supported. Should be set in constructor of derived classes.
 	UPROPERTY(VisibleAnywhere)
 	TArray<TEnumAsByte<EMeasurementType>> MeasurementTypes;
 
+	// Capture resolution.
 	UPROPERTY(EditAnywhere)
 	FIntPoint SizeXY = FIntPoint(960, 540);
 
+	// Monotonically increasing counter of frames captured.
 	UPROPERTY(VisibleAnywhere)
 	int32 SequenceId = 0;
-	
+
+	// Initialize our RenderTarget and TextureRHICopy with the current settings.
 	void InitRenderTarget();
 
-
 private:
+	// Capture a frame, if any client has requested one.
 	void MaybeCapture();
 
+	// Our Queue of pending texture reads.
 	FTextureReadQueue TextureReadQueue;
 
-	FGPUFenceRHIRef RenderFence;
-
+	// A fence to indicate that our render textures have been initialized. Should only be accessed from the Game thread.
 	FRenderCommandFence TextureInitFence;
 
-	// We must copy our TextureTarget's resource here before reading it on the CPU.
+	// A GPU fence to indicate that our latest render has completed. Should only be accessed from the Render thread.
+	FGPUFenceRHIRef RenderFence;
+
+	// We must copy our TextureTarget's resource here before reading it on the CPU
+	// because USceneCaptureComponent's RenderTarget is not set up to do so.
 	FTextureRHIRef TextureRHICopy;
 
 	FTimerHandle TimerHandle;
