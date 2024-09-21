@@ -10,7 +10,8 @@
 UTempoSceneCaptureComponent2D::UTempoSceneCaptureComponent2D()
 {
 	PrimaryComponentTick.bStartWithTickEnabled = false;
-	ShowFlags.SetAntiAliasing(true);
+	ShowFlags.SetAntiAliasing(false);
+	ShowFlags.SetMotionBlur(false);
 	bCaptureEveryFrame = false;
 	bCaptureOnMovement = false;
 	bTickInEditor = false;
@@ -24,33 +25,42 @@ void UTempoSceneCaptureComponent2D::BeginPlay()
 	GetWorld()->GetTimerManager().SetTimer(TimerHandle, this, &UTempoSceneCaptureComponent2D::MaybeCapture, 1.0 / RateHz, true);
 }
 
-void UTempoSceneCaptureComponent2D::OnFrameRenderCompleted()
+void UTempoSceneCaptureComponent2D::OnFrameRenderCompleted(bool bBlock)
 {
-	if (!TextureReadQueue.HasOutstandingTextureReads() || !ensureMsgf(RenderFence.IsValid(), TEXT("Encountered invalid GPU render fence in %s"), *GetName()))
+	if (!TextureReadQueue.HasOutstandingTextureReads() || !RenderFence.IsValid())
 	{
 		return;
 	}
-	
-	while (!RenderFence->Poll())
+
+	// if (bBlock)
+	// {
+	// 	while (!RenderFence->Poll())
+	// 	{
+	// 		FPlatformProcess::Sleep(1e-4);
+	// 	}
+	// }
+	if (!RenderFence->Poll())
 	{
-		FPlatformProcess::Sleep(1e-4);
+		return;
 	}
+
 	RenderFence.SafeRelease();
 	
 	const FRenderTarget* RenderTarget = TextureTarget->GetRenderTargetResource();
 	if (!RenderTarget)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("RenderTarget is not initialized"));
+		UE_LOG(LogTempoSensorsShared, Warning, TEXT("RenderTarget was not initialized. Skipping texture read."));
 		TextureReadQueue.SkipNextPendingTextureRead();
 		return;
 	}
-	if (!TextureRHICopy.IsValid())
+	if (!TextureRHICopy.IsValid() || !TextureRHICopy->IsValid() || TextureRHICopy->GetFormat() != TextureTarget->GetFormat())
 	{
-		UE_LOG(LogTemp, Warning, TEXT("TextureRHICopy is not valid"));
+		UE_LOG(LogTempoSensorsShared, Warning, TEXT("TextureRHICopy was not valid. Skipping texture read."));
 		TextureReadQueue.SkipNextPendingTextureRead();
 		return;
 	}
 
+	UE_LOG(LogTemp, Warning, TEXT("Reading at %lu"), GFrameCounterRenderThread);
 	TextureReadQueue.BeginNextPendingTextureRead(RenderTarget, TextureRHICopy);
 }
 
@@ -67,20 +77,36 @@ FString UTempoSceneCaptureComponent2D::GetSensorName() const
 }
 
 void UTempoSceneCaptureComponent2D::UpdateSceneCaptureContents(FSceneInterface* Scene)
-{	
+{
+	TextureCreationFence.Wait();
+
+	const FTextureRenderTargetResource* RenderTarget = TextureTarget->GameThread_GetRenderTargetResource();
+	if (!RenderTarget || !RenderTarget->IsInitialized())
+	{
+		UE_LOG(LogTempoSensorsShared, Warning, TEXT("RenderTarget was not initialized. Skipping capture."));
+		return;
+	}
+	if (!TextureRHICopy.IsValid() || !TextureRHICopy->IsValid() || TextureRHICopy->GetFormat() != TextureTarget->GetFormat())
+	{
+		UE_LOG(LogTempoSensorsShared, Warning, TEXT("TextureRHICopy was not valid. Skipping capture."));
+		return;
+	}
+
+	// TODO: REMOVE THIS
 	if (TextureReadQueue.GetNumPendingTextureReads() > GetMaxTextureQueueSize())
 	{
-		UE_LOG(LogTempoSensorsShared, Warning, TEXT("Fell behind while rendering frames from sensor %s owner %s. Dropping frame."), *GetSensorName(), *GetOwnerName());
+		UE_LOG(LogTempoSensorsShared, Warning, TEXT("Fell behind while reading frames from sensor %s owner %s. Skipping capture."), *GetSensorName(), *GetOwnerName());
 		return;
 	}
 
 	Super::UpdateSceneCaptureContents(Scene);
 	
-	ENQUEUE_RENDER_COMMAND(SetTempoCameraRenderFence)(
+	ENQUEUE_RENDER_COMMAND(SetTempoSceneCaptureRenderFence)(
 	[this](FRHICommandList& RHICmdList)
 	{
 		if (!RenderFence.IsValid())
 		{
+			UE_LOG(LogTemp, Warning, TEXT("Inserting render fence at %lu"), GFrameCounterRenderThread);
 			RenderFence = RHICreateGPUFence(TEXT("TempoCameraRenderFence"));
 			RHICmdList.WriteGPUFence(RenderFence);
 		}
@@ -133,8 +159,8 @@ void UTempoSceneCaptureComponent2D::InitRenderTarget()
 		&TextureRHICopy
 	};
 
-	ENQUEUE_RENDER_COMMAND(InitCommand)(
-		[Context](FRHICommandList& RHICmdList)
+	ENQUEUE_RENDER_COMMAND(InitTempoSceneCaptureTextureCopy)(
+		[Context](FRHICommandListImmediate& RHICmdList)
 		{
 			// Create the TextureRHICopy, where we will copy our TextureTarget's resource before reading it on the CPU.
 			constexpr ETextureCreateFlags TexCreateFlags = ETextureCreateFlags::Shared | ETextureCreateFlags::CPUReadback;
@@ -146,7 +172,11 @@ void UTempoSceneCaptureComponent2D::InitRenderTarget()
 				.SetFlags(TexCreateFlags);
 
 			*Context.TextureRHICopy = RHICreateTexture(Desc);
+
+			UE_LOG(LogTemp, Warning, TEXT("Created teture copy"));
 		});
+
+	TextureCreationFence.BeginFence();
 }
 
 TOptional<TFuture<void>> UTempoSceneCaptureComponent2D::FlushMeasurementResponses()
@@ -161,8 +191,5 @@ TOptional<TFuture<void>> UTempoSceneCaptureComponent2D::FlushMeasurementResponse
 
 void UTempoSceneCaptureComponent2D::FlushPendingRenderingCommands() const
 {
-	if (TextureReadQueue.HasOutstandingTextureReads())
-	{
-		TextureReadQueue.FlushPendingTextureReads();
-	}
+	TextureReadQueue.FlushPendingTextureReads();
 }

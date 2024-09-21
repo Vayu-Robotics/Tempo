@@ -26,11 +26,13 @@ public:
 
 	virtual float GetRate() const = 0;
 
+	// What measurement types does this sensor support?
 	virtual const TArray<TEnumAsByte<EMeasurementType>>& GetMeasurementTypes() const = 0;
 
 	// A sensor should override this to grab any necessary end-of-frame operations from the render thread.
-	virtual void OnFrameRenderCompleted() = 0;
+	virtual void OnFrameRenderCompleted(bool bBlock) = 0;
 
+	// 
 	virtual bool HasPendingRenderingCommands() = 0;
 
 	virtual void FlushPendingRenderingCommands() const = 0;

@@ -48,6 +48,8 @@ struct TTextureReadBase : FTextureRead
 
 	virtual void BeginRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy) override
 	{
+		UE_LOG(LogTemp, Warning, TEXT("Beginning texture read %s"), *GetType().ToString());
+
 		FRHICommandListImmediate& RHICmdList = FRHICommandListImmediate::Get();
 
 		// Then, transition our TextureTarget to be copyable.
@@ -97,6 +99,12 @@ struct FTextureReadQueue
 	{
 		FScopeLock Lock(&Mutex);
 		PendingTextureReads.Emplace(TextureRead);
+	}
+
+	void Empty()
+	{
+		FScopeLock Lock(&Mutex);
+		PendingTextureReads.Empty();
 	}
 
 	void BeginNextPendingTextureRead(const FRenderTarget* RenderTarget, const FTextureRHIRef& TextureRHICopy)
@@ -163,7 +171,7 @@ public:
 	
 	virtual const TArray<TEnumAsByte<EMeasurementType>>& GetMeasurementTypes() const override { return MeasurementTypes; }
 
-	virtual void OnFrameRenderCompleted() override;
+	virtual void OnFrameRenderCompleted(bool bBlock) override;
 	
 	virtual bool HasPendingRenderingCommands() override { return TextureReadQueue.HasOutstandingTextureReads(); }
 	
@@ -204,11 +212,13 @@ protected:
 
 	FGPUFenceRHIRef RenderFence;
 
+	FRenderCommandFence TextureCreationFence;
+
 private:
 	void MaybeCapture();
 
 	// We must copy our TextureTarget's resource here before reading it on the CPU.
-	mutable FTextureRHIRef TextureRHICopy;
+	FTextureRHIRef TextureRHICopy;
 
 	FTimerHandle TimerHandle;
 };

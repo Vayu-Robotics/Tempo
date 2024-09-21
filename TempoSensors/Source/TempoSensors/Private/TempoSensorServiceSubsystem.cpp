@@ -45,7 +45,6 @@ void UTempoSensorServiceSubsystem::Initialize(FSubsystemCollectionBase& Collecti
 
 void UTempoSensorServiceSubsystem::OnRenderFrameCompleted() const
 {
-	// Don't do any of this if not fixed step mode?
 	if (!GetWorld())
 	{
 		return;
@@ -58,12 +57,17 @@ void UTempoSensorServiceSubsystem::OnRenderFrameCompleted() const
 	});
 	if (bHasPendingRenderingCommands)
 	{
-		FRHICommandListImmediate& RHICmdList = FRHICommandListImmediate::Get();
-		RHICmdList.BlockUntilGPUIdle();
-
-		ForEachSensor([](ITempoSensorInterface* Sensor)
+		const bool bBlock = GetDefault<UTempoCoreSettings>()->GetTimeMode() == ETimeMode::FixedStep;
+		if (bBlock)
 		{
-			Sensor->OnFrameRenderCompleted();
+			FRHICommandListImmediate& RHICmdList = FRHICommandListImmediate::Get();
+			RHICmdList.SubmitCommandsAndFlushGPU();
+			RHICmdList.BlockUntilGPUIdle();
+		}
+
+		ForEachSensor([bBlock](ITempoSensorInterface* Sensor)
+		{
+			Sensor->OnFrameRenderCompleted(bBlock);
 		});
 	}
 }

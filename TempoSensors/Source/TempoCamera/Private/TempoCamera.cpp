@@ -147,9 +147,12 @@ UTempoCamera::UTempoCamera()
 	MeasurementTypes = { EMeasurementType::COLOR_IMAGE, EMeasurementType::LABEL_IMAGE, EMeasurementType::DEPTH_IMAGE};
 	CaptureSource = ESceneCaptureSource::SCS_FinalColorLDR;
 	PostProcessSettings.AutoExposureMethod = AEM_Basic;
-	PostProcessSettings.AutoExposureSpeedUp = 20.0;
-	PostProcessSettings.AutoExposureSpeedDown = 20.0;
+	PostProcessSettings.AutoExposureSpeedUp = 1.0;
+	PostProcessSettings.AutoExposureSpeedDown = 1.0;
 	PostProcessSettings.MotionBlurAmount = 0.0;
+	ShowFlags.SetAntiAliasing(true);
+	ShowFlags.SetTemporalAA(true);
+	ShowFlags.SetMotionBlur(false);
 
 	// No depth settings
 	RenderTargetFormat = ETextureRenderTargetFormat::RTF_RGBA8; // Corresponds to PF_B8G8R8A8
@@ -165,6 +168,12 @@ void UTempoCamera::BeginPlay()
 
 void UTempoCamera::UpdateSceneCaptureContents(FSceneInterface* Scene)
 {
+	if (!bDepthEnabled && !PendingDepthImageRequests.IsEmpty())
+	{
+		// If a client is requesting depth, start rendering it.
+		SetDepthEnabled(true);
+	}
+	
 	if (bDepthEnabled && PendingDepthImageRequests.IsEmpty())
 	{
 		// If no client is requesting depth, stop rendering it.
@@ -201,8 +210,6 @@ void UTempoCamera::RequestMeasurement(const TempoCamera::LabelImageRequest& Requ
 void UTempoCamera::RequestMeasurement(const TempoCamera::DepthImageRequest& Request, const TResponseDelegate<TempoCamera::DepthImage>& ResponseContinuation)
 {
 	PendingDepthImageRequests.Add({ Request, ResponseContinuation});
-
-	SetDepthEnabled(true);
 }
 
 void UTempoCamera::SetDepthEnabled(bool bDepthEnabledIn)
@@ -295,6 +302,7 @@ void UTempoCamera::ApplyDepthEnabled()
 		}
 		PostProcessSettings.WeightedBlendables.Array.Empty();
 		PostProcessSettings.WeightedBlendables.Array.Init(FWeightedBlendable(1.0, PostProcessMaterialInstance), 1);
+		PostProcessMaterialInstance->EnsureIsComplete();
 	}
 	else
 	{
@@ -302,6 +310,8 @@ void UTempoCamera::ApplyDepthEnabled()
 	}
 
 	InitRenderTarget();
+	// Should we only ApplyDepthEnabled at the end of a render frame?
+	TextureReadQueue.Empty();
 }
 
 TFuture<void> UTempoCamera::DecodeAndRespond(TUniquePtr<FTextureRead> TextureRead)
