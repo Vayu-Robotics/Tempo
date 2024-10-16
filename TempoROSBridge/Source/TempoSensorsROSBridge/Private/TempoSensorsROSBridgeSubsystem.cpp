@@ -156,29 +156,8 @@ void UTempoSensorsROSBridgeSubsystem::UpdatePublishers()
 					const FString CameraInfoTopic = CameraInfoTopicFromBaseTopic(Topic);
 					ROSNode->AddPublisher<FTempoCameraInfo>(CameraInfoTopic, FROSQOSProfile(1).Reliable());
 				}
-				
-				switch (MeasurementType)
-				{
-					case COLOR_IMAGE:
-						{
-							ROSNode->AddPublisher<TempoCamera::ColorImage>(Topic, FROSQOSProfile(1).Reliable());
-							break;
-						}
-					case DEPTH_IMAGE:
-						{
-							ROSNode->AddPublisher<TempoCamera::DepthImage>(Topic, FROSQOSProfile(1).Reliable());
-							break;
-						}
-					case LABEL_IMAGE:
-						{
-							ROSNode->AddPublisher<TempoCamera::LabelImage>(Topic, FROSQOSProfile(1).Reliable());
-							break;
-						}
-					default:
-						{
-							checkf(false, TEXT("Unhandled measurement type"));
-						}
-				}
+
+				AddImagePublisher(MeasurementType, Topic);
 			}
 
 			if (const UTempoCamera* Camera = Cast<UTempoCamera>(Sensor))
@@ -250,7 +229,7 @@ void UTempoSensorsROSBridgeSubsystem::OnMeasurementReceived(const MeasurementTyp
 	
 	if (Status.ok())
 	{
-		ROSNode->Publish(Topic, Image);
+		PublishImage(Image, Topic);
 	}
 	
 	TopicsWithPendingRequests.Remove(Topic);
@@ -264,4 +243,69 @@ void UTempoSensorsROSBridgeSubsystem::OnMeasurementReceived(const MeasurementTyp
 				this, &UTempoSensorsROSBridgeSubsystem::OnMeasurementReceived, Topic));
 		TopicsWithPendingRequests.Add(Topic);
 	}
+}
+
+void UTempoSensorsROSBridgeSubsystem::AddImagePublisher(const EMeasurementType& MeasurementType, FString Topic)
+{
+	switch (MeasurementType)
+	{
+	case COLOR_IMAGE:
+		{
+			ROSNode->AddPublisher<TempoCamera::ColorImage>(Topic, FROSQOSProfile(1).Reliable());
+			break;
+		}
+	case DEPTH_IMAGE:
+		{
+			ROSNode->AddPublisher<TempoCamera::DepthImage>(Topic, FROSQOSProfile(1).Reliable());
+			break;
+		}
+	case LABEL_IMAGE:
+		{
+			ROSNode->AddPublisher<TempoCamera::LabelImage>(Topic, FROSQOSProfile(1).Reliable());
+			break;
+		}
+	default:
+		{
+			checkf(false, TEXT("Unhandled measurement type"));
+		}
+	}
+}
+
+void UTempoSensorsROSBridgeSubsystem::PublishColorImage(const TempoCamera::ColorImage& Image, FString Topic)
+{
+	ROSNode->Publish(Topic, Image);
+}
+
+void UTempoSensorsROSBridgeSubsystem::PublishLabelImage(const TempoCamera::LabelImage& Image, FString Topic)
+{
+	ROSNode->Publish(Topic, Image);
+}
+
+void UTempoSensorsROSBridgeSubsystem::PublishDepthImage(const TempoCamera::DepthImage& Image, FString Topic)
+{
+	ROSNode->Publish(Topic, Image);
+}
+
+template <>
+void UTempoSensorsROSBridgeSubsystem::PublishImage<TempoCamera::ColorImage>(const TempoCamera::ColorImage& Image, FString Topic)
+{
+	PublishColorImage(Image, Topic);
+}
+
+template <>
+void UTempoSensorsROSBridgeSubsystem::PublishImage<TempoCamera::DepthImage>(const TempoCamera::DepthImage& Image, FString Topic)
+{
+	PublishDepthImage(Image, Topic);
+}
+
+template <>
+void UTempoSensorsROSBridgeSubsystem::PublishImage<TempoCamera::LabelImage>(const TempoCamera::LabelImage& Image, FString Topic)
+{
+	PublishLabelImage(Image, Topic);
+}
+
+template <typename MeasurementType>
+void UTempoSensorsROSBridgeSubsystem::PublishImage(const MeasurementType& Image, FString Topic)
+{
+	static_assert(False<MeasurementType>{}, "PublishImage called with unsupported image type");
 }
