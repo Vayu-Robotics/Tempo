@@ -213,12 +213,33 @@ bool UTempoRoadLaneGraphSubsystem::TryGenerateAndRegisterZoneShapeComponentsForR
 		const int32 ControlPointEndIndex = bQueryActorIsRoadModule
 			? NumControlPoints - 1
 			: ITempoRoadInterface::Execute_GetTempoEndEntranceLocationControlPointIndex(&RoadQueryActor);
-		
-		for (int32 ControlPointIndex = ControlPointStartIndex; ControlPointIndex <= ControlPointEndIndex; ++ControlPointIndex)
+
+		for (int32 ControlPointIndex = ControlPointStartIndex; ControlPointIndex < ControlPointEndIndex; ++ControlPointIndex)
 		{
 			FZoneShapePoint ZoneShapePoint = CreateZoneShapePointForRoadControlPoint(RoadQueryActor, ControlPointIndex, bQueryActorIsRoadModule);
 			ZoneShapeComponent->GetMutablePoints().Add(ZoneShapePoint);
+
+			const float ThisControlPointDistance = bQueryActorIsRoadModule ? ITempoRoadModuleInterface::Execute_GetDistanceAlongTempoRoadModuleAtControlPoint(&RoadQueryActor, ControlPointIndex) : ITempoRoadInterface::Execute_GetDistanceAlongTempoRoadAtControlPoint(&RoadQueryActor, ControlPointIndex);
+			const float NextControlPointDistance = bQueryActorIsRoadModule ? ITempoRoadModuleInterface::Execute_GetDistanceAlongTempoRoadModuleAtControlPoint(&RoadQueryActor, ControlPointIndex + 1) : ITempoRoadInterface::Execute_GetDistanceAlongTempoRoadAtControlPoint(&RoadQueryActor, ControlPointIndex + 1);
+
+			FVector ZoneShapePointTangent = bQueryActorIsRoadModule
+				? ITempoRoadModuleInterface::Execute_GetTangentAtDistanceAlongTempoRoadModule(&RoadQueryActor, ThisControlPointDistance, ETempoCoordinateSpace::Local)
+				: ITempoRoadInterface::Execute_GetTangentAtDistanceAlongTempoRoad(&RoadQueryActor, ThisControlPointDistance, ETempoCoordinateSpace::Local);
+			float SegmentDistance = ZoneShapePointTangent.Size() * 2.0;
+			for (float Distance = ThisControlPointDistance + SegmentDistance; Distance < NextControlPointDistance - SegmentDistance; Distance+=SegmentDistance)
+			{
+				ZoneShapePointTangent = bQueryActorIsRoadModule
+					? ITempoRoadModuleInterface::Execute_GetTangentAtDistanceAlongTempoRoadModule(&RoadQueryActor, Distance, ETempoCoordinateSpace::Local)
+					: ITempoRoadInterface::Execute_GetTangentAtDistanceAlongTempoRoad(&RoadQueryActor, Distance, ETempoCoordinateSpace::Local);
+				SegmentDistance = ZoneShapePointTangent.Size() * 2.0;
+				
+				ZoneShapePoint = CreateZoneShapePointAtDistanceAlongRoad(RoadQueryActor, Distance, bQueryActorIsRoadModule);
+				ZoneShapeComponent->GetMutablePoints().Add(ZoneShapePoint);
+			}
 		}
+
+		FZoneShapePoint ZoneShapePoint = CreateZoneShapePointForRoadControlPoint(RoadQueryActor, ControlPointEndIndex, bQueryActorIsRoadModule);
+		ZoneShapeComponent->GetMutablePoints().Add(ZoneShapePoint);
 
 		ZoneShapeComponents.Add(ZoneShapeComponent);
 	}
