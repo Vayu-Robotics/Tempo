@@ -1,0 +1,117 @@
+name: Build and Package Tempo in TempoSample Project | Linux | UE5.4
+
+on: [push, pull_request]
+
+env:
+  UNREAL_VERSION: "5.4.4"
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Check free space at start
+      run: df -h /
+    - name: Free Disk Space
+      uses: jlumbroso/free-disk-space@main
+      with:
+        tool-cache: true
+        android: true
+        dotnet: true
+        haskell: true
+        large-packages: false
+        docker-images: true
+        swap-storage: true
+    # - name: Patch Docker Daemon data-root
+    #   run: |
+    #     DOCKER_DATA_ROOT='/mnt/var/lib/docker'
+    #     DOCKER_DAEMON_JSON='/etc/docker/daemon.json'
+    #     sudo mkdir -p "${DOCKER_DATA_ROOT}"
+    #     jq --arg dataroot "${DOCKER_DATA_ROOT}" '. + {"data-root": $dataroot}' "${DOCKER_DAEMON_JSON}" > "/tmp/docker.json.tmp"
+    #     sudo mv "/tmp/docker.json.tmp" "${DOCKER_DAEMON_JSON}"
+    #     sudo systemctl restart docker
+    - name: Install Dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq rsync
+    - name: Checkout TempoSample
+      uses: actions/checkout@v4
+      with:
+        repository: tempo-sim/TempoSample
+        path: TempoSample
+    - name: Checkout Tempo
+      uses: actions/checkout@v4
+      with:
+        path: TempoSample/Plugins/Tempo
+        submodules: recursive
+    - name: Sync TempoThirdParty Dependencies
+      run: |
+        mkdir -p TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries
+        touch TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries/dummy.txt
+        mkdir -p TempoSample/Plugins/Tempo/TempoROS/Source/ThirdParty/rclcpp/Libraries
+        touch TempoSample/Plugins/Tempo/TempoROS/Source/ThirdParty/rclcpp/Libraries/dummy.txt
+        TempoSample/Plugins/Tempo/Scripts/SyncDeps.sh -force
+        TempoSample/Plugins/Tempo/TempoROS/Scripts/SyncDeps.sh -force
+    # - name: Cache Dependencies
+    #   uses: actions/cache@v4
+    #   with:
+    #     path: |
+    #       TempoSample/Intermediate/**
+    #       TempoSample/DerivedDataCache/**
+    #       TempoSample/Saved/**
+    #       TempoSample/Plugins/**/Intermediate/**
+    #       TempoSample/Plugins/**/ThirdParty/**/Binaries
+    #       TempoSample/Plugins/**/ThirdParty/**/Libraries
+    #       TempoSample/Plugins/**/ThirdParty/**/Includes
+    #       ~/.cache/UnrealEngine/**
+    #       # Cached engine mods
+    #       # /home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph
+    #       # /home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd
+    #     key: ${{ runner.os }}-docker-unreal-${{ env.UNREAL_VERSION }}-${{ hashFiles('TempoSample/*.uproject') }}-${{ hashFiles('TempoSample/Plugins/Tempo/**/*.uplugin') }}
+    #     restore-keys: |
+    #       ${{ runner.os }}-docker-unreal-${{ env.UNREAL_VERSION }}-
+    - name: Cache Engine Mods
+      id: cache-engine-mods
+      uses: actions/cache@v4
+      with:
+        path: |
+          .engine-mods-cache/Engine/Plugins/Runtime/ZoneGraph
+          .engine-mods-cache/Engine/Plugins/AI/MassCrowd
+        key: tempo-engine-mods-${{ env.UNREAL_VERSION }}-${{ hashFiles('TempoSample/Plugins/Tempo/EngineMods/**') }}
+    - name: Log in to Epic Container Registry
+      uses: docker/login-action@v2
+      with:
+        registry: ghcr.io
+        username: ${{ secrets.EPIC_DOCKER_USERNAME }}
+        password: ${{ secrets.EPIC_DOCKER_TOKEN }}
+    - name: Initialize Engine Mods Cache
+      if: steps.cache-engine-mods.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p .engine-mods-cache/Engine/Plugins/Runtime
+        mkdir -p .engine-mods-cache/Engine/Plugins/AI
+        docker create --name temp_engine ghcr.io/epicgames/unreal-engine:dev-slim-${{ env.UNREAL_VERSION }}
+        docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/Runtime
+        docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI
+        docker rm temp_engine
+    - name: Check free space before build
+      run: df -h /
+    - name: Setup Unreal & Build
+      run: |
+        docker run --rm \
+          --user=root \
+          -e UNREAL_ENGINE_PATH="/home/ue4/UnrealEngine" \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/Runtime/ZoneGraph:/home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI/MassCrowd:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd \
+          -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
+          ghcr.io/epicgames/unreal-engine:dev-slim-${{ env.UNREAL_VERSION }} \
+          bash -c 'apt-get update && apt-get install -y jq rsync && \
+                   /home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh && \
+                   /home/ue4/TempoSample/Scripts/Build.sh'
+    - name: Check free space after build
+      run: df -h /
+
+    # - name: Upload Built Plugin
+    #   uses: actions/upload-artifact@v3
+    #   with:
+    #     name: ${{ env.PLUGIN_NAME }}
+    #     path: /home/ue4/packaged-plugin/
