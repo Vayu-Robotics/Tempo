@@ -66,7 +66,7 @@ jobs:
     - name: Find Common Ancestor with Main
       id: common_ancestor
       run: |
-        cd TempoSample/Plugins/Tempo && echo "COMMON_ANCESTOR=$(git merge-base --fork-point origin/$BASE_BRANCH)" >> $GITHUB_OUTPUT
+        cd TempoSample/Plugins/Tempo && echo "COMMON_ANCESTOR=$(git merge-base --fork-point origin/main)" >> $GITHUB_OUTPUT
     - name: Restore Build Cache from Main Common Ancestor
       uses: actions/cache/restore@v4
       with:
