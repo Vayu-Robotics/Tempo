@@ -1,6 +1,9 @@
 name: Build and Package Tempo in TempoSample Project | Linux | UE5.4
 
-on: [push, pull_request, workflow_dispatch]
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
 env:
   UNREAL_VERSION: "5.4.4"
