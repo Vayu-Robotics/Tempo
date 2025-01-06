@@ -63,6 +63,10 @@ jobs:
           TempoSample/Saved/**
           TempoSample/Plugins/**/Intermediate/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
+    - name: Check Cached Build
+      run: |
+        du -sh TempoSample/* | sort -h
+        du -sh TempoSample/Intermediate/* | sort -h
     - name: Cache Engine Mods
       id: cache-engine-mods
       uses: actions/cache@v4
