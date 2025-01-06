@@ -16,7 +16,7 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
-    - name: Check free space at start
+    - name: Check Free Space at Start
       run: df -h /
     - name: Free Disk Space
       uses: jlumbroso/free-disk-space@main
@@ -51,24 +51,6 @@ jobs:
         touch TempoSample/Plugins/Tempo/TempoROS/Source/ThirdParty/rclcpp/Libraries/dummy.txt
         TempoSample/Plugins/Tempo/Scripts/SyncDeps.sh -force
         TempoSample/Plugins/Tempo/TempoROS/Scripts/SyncDeps.sh -force
-    # - name: Cache Dependencies
-    #   uses: actions/cache@v4
-    #   with:
-    #     path: |
-    #       TempoSample/Intermediate/**
-    #       TempoSample/DerivedDataCache/**
-    #       TempoSample/Saved/**
-    #       TempoSample/Plugins/**/Intermediate/**
-    #       TempoSample/Plugins/**/ThirdParty/**/Binaries
-    #       TempoSample/Plugins/**/ThirdParty/**/Libraries
-    #       TempoSample/Plugins/**/ThirdParty/**/Includes
-    #       ~/.cache/UnrealEngine/**
-    #       # Cached engine mods
-    #       # /home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph
-    #       # /home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd
-    #     key: ${{ runner.os }}-docker-unreal-${{ env.UNREAL_VERSION }}-${{ hashFiles('TempoSample/*.uproject') }}-${{ hashFiles('TempoSample/Plugins/Tempo/**/*.uplugin') }}
-    #     restore-keys: |
-    #       ${{ runner.os }}-docker-unreal-${{ env.UNREAL_VERSION }}-
     - name: Find Common Ancestor with Main
       id: common_ancestor
       run: |
@@ -90,6 +72,8 @@ jobs:
           .engine-mods-cache/Engine/Plugins/Runtime/ZoneGraph
           .engine-mods-cache/Engine/Plugins/AI/MassCrowd
         key: tempo-engine-mods-${{ env.UNREAL_VERSION }}-${{ hashFiles('TempoSample/Plugins/Tempo/EngineMods/**') }}
+    - name: Check Free Space Before Docker Pull
+      run: df -h /
     - name: Log in to Epic Container Registry
       uses: docker/login-action@v2
       with:
@@ -105,8 +89,6 @@ jobs:
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/Runtime
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI
         docker rm temp_engine
-    - name: Check free space before build
-      run: df -h /
     - name: Setup Unreal & Build
       run: |
         docker run --rm \
@@ -119,7 +101,7 @@ jobs:
           bash -c 'apt-get update && apt-get install -y jq rsync && \
                    /home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh && \
                    /home/ue4/TempoSample/Scripts/Build.sh'
-    - name: Check free space after build
+    - name: Check Free Space After Build
       run: df -h /
     - name: Cache Build (only if main)
       if: github.ref == 'refs/heads/main'
