@@ -1,4 +1,4 @@
-name: Build and Package Tempo in TempoSample Project | Linux | UE5.4
+name: Build and Package Tempo Branch in TempoSample Project | Linux | UE5.4
 
 on: [push, pull_request]
 
@@ -22,14 +22,6 @@ jobs:
         large-packages: false
         docker-images: true
         swap-storage: true
-    # - name: Patch Docker Daemon data-root
-    #   run: |
-    #     DOCKER_DATA_ROOT='/mnt/var/lib/docker'
-    #     DOCKER_DAEMON_JSON='/etc/docker/daemon.json'
-    #     sudo mkdir -p "${DOCKER_DATA_ROOT}"
-    #     jq --arg dataroot "${DOCKER_DATA_ROOT}" '. + {"data-root": $dataroot}' "${DOCKER_DAEMON_JSON}" > "/tmp/docker.json.tmp"
-    #     sudo mv "/tmp/docker.json.tmp" "${DOCKER_DAEMON_JSON}"
-    #     sudo systemctl restart docker
     - name: Install Dependencies
       run: |
         sudo apt-get update
@@ -109,9 +101,3 @@ jobs:
                    /home/ue4/TempoSample/Scripts/Build.sh'
     - name: Check free space after build
       run: df -h /
-
-    # - name: Upload Built Plugin
-    #   uses: actions/upload-artifact@v3
-    #   with:
-    #     name: ${{ env.PLUGIN_NAME }}
-    #     path: /home/ue4/packaged-plugin/
