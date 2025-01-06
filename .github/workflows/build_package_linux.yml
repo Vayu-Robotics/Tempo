@@ -1,9 +1,6 @@
 name: Build and Package Tempo in TempoSample Project | Linux | UE5.4
 
-on:
-  push:
-  pull_request:
-  workflow_dispatch:
+on: [push, pull_request, workflow_dispatch]
 
 env:
   UNREAL_VERSION: "5.4.4"
@@ -89,7 +86,7 @@ jobs:
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/Runtime
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI
         docker rm temp_engine
-    - name: Setup Unreal & Build
+    - name: Docker Pull Unreal Image & Build
       run: |
         docker run --rm \
           --user=root \
@@ -104,7 +101,7 @@ jobs:
     - name: Check Free Space After Build
       run: df -h /
     - name: Cache Build (only if main)
-      # if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: |
@@ -112,5 +109,5 @@ jobs:
           TempoSample/DerivedDataCache/**
           TempoSample/Saved/**
           TempoSample/Plugins/**/Intermediate/**
-        # key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
-        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
+        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
+        # key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
