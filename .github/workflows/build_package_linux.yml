@@ -1,4 +1,4 @@
-name: Build and Package Tempo Branch in TempoSample Project | Linux | UE5.4
+name: Build and Package Tempo in TempoSample Project | Linux | UE5.4
 
 on: [push, pull_request]
 
@@ -36,6 +36,7 @@ jobs:
       with:
         path: TempoSample/Plugins/Tempo
         submodules: recursive
+        fetch-depth: 0
     - name: Sync TempoThirdParty Dependencies
       run: |
         mkdir -p TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries
@@ -62,6 +63,19 @@ jobs:
     #     key: ${{ runner.os }}-docker-unreal-${{ env.UNREAL_VERSION }}-${{ hashFiles('TempoSample/*.uproject') }}-${{ hashFiles('TempoSample/Plugins/Tempo/**/*.uplugin') }}
     #     restore-keys: |
     #       ${{ runner.os }}-docker-unreal-${{ env.UNREAL_VERSION }}-
+    - name: Find Common Ancestor with Main
+      id: common_ancestor
+      run: |
+        echo "COMMON_ANCESTOR=$(git merge-base --fork-point origin/$BASE_BRANCH)" >> $GITHUB_OUTPUT
+    - name: Restore Build Cache from Main Common Ancestor
+      uses: actions/cache/restore@v4
+      with:
+        path: |
+          TempoSample/Intermediate/**
+          TempoSample/DerivedDataCache/**
+          TempoSample/Saved/**
+          TempoSample/Plugins/**/Intermediate/**
+        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
     - name: Cache Engine Mods
       id: cache-engine-mods
       uses: actions/cache@v4
@@ -101,3 +115,13 @@ jobs:
                    /home/ue4/TempoSample/Scripts/Build.sh'
     - name: Check free space after build
       run: df -h /
+    - name: Cache Build (only if main)
+      if: github.ref == 'refs/heads/main'
+      uses: actions/cache/save@v4
+      with:
+        path: |
+          TempoSample/Intermediate/**
+          TempoSample/DerivedDataCache/**
+          TempoSample/Saved/**
+          TempoSample/Plugins/**/Intermediate/**
+        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
