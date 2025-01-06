@@ -56,6 +56,8 @@ jobs:
       uses: actions/cache/restore@v4
       with:
         path: |
+          TempoSample/Binaries/**
+          TempoSample/Build/**
           TempoSample/Intermediate/**
           TempoSample/DerivedDataCache/**
           TempoSample/Saved/**
@@ -101,13 +103,15 @@ jobs:
     - name: Check Free Space After Build
       run: df -h /
     - name: Cache Build (only if main)
-      if: github.ref == 'refs/heads/main'
+      # if: github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: |
+          TempoSample/Binaries/**
+          TempoSample/Build/**
           TempoSample/Intermediate/**
           TempoSample/DerivedDataCache/**
           TempoSample/Saved/**
           TempoSample/Plugins/**/Intermediate/**
-        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
-        # key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
+        # key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
+        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
