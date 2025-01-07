@@ -53,6 +53,25 @@ COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Experimental/AnimToTextur
 COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/AR/AppleAR/AppleARKitFaceSupport /home/ue4/UnrealEngine/Engine/Plugins/Runtime/AR/AppleAR/AppleARKitFaceSupport
 COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Experimental/ChaosVehiclesPlugin /home/ue4/UnrealEngine/Engine/Plugins/Experimental/ChaosVehiclesPlugin
 COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/HairStrands /home/ue4/UnrealEngine/Engine/Plugins/Runtime/HairStrands
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Animation/LiveLink /home/ue4/UnrealEngine/Engine/Plugins/Animation/LiveLink
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/AI/MassAI /home/ue4/UnrealEngine/Engine/Plugins/AI/MassAI
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd /home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/MassEntity /home/ue4/UnrealEngine/Engine/Plugins/Runtime/MassEntity
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/MassGameplay /home/ue4/UnrealEngine/Engine/Plugins/Runtime/MassGameplay
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/MeshModelingToolset /home/ue4/UnrealEngine/Engine/Plugins/Runtime/MeshModelingToolset
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Animation/RigLogic /home/ue4/UnrealEngine/Engine/Plugins/Animation/RigLogic
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Experimental/StructUtils /home/ue4/UnrealEngine/Engine/Plugins/Experimental/StructUtils
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph /home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraphAnnotations /home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraphAnnotations
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Compression/OodleNetwork /home/ue4/UnrealEngine/Engine/Plugins/Compression/OodleNetwork
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Online/OnlineSubsystem /home/ue4/UnrealEngine/Engine/Plugins/Online/OnlineSubsystem
+COPY --from=base /home/ue4/UnrealEngine/Engine/PluginsOnline/OnlineSubsystemUtils /home/ue4/UnrealEngine/Engine/PluginsOnline/OnlineSubsystemUtils
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/LinuxDeviceProfileSelector /home/ue4/UnrealEngine/Engine/Plugins/Runtime/LinuxDeviceProfileSelector
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/EnhancedInput /home/ue4/UnrealEngine/Engine/Plugins/EnhancedInput
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/PCG /home/ue4/UnrealEngine/Engine/Plugins/PCG
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/OpenXR /home/ue4/UnrealEngine/Engine/Plugins/Runtime/OpenXR
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/OpenXRHandTracking /home/ue4/UnrealEngine/Engine/Plugins/Runtime/OpenXRHandTracking
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/RigVM /home/ue4/UnrealEngine/Engine/Plugins/Runtime/RigVM
 
 # Install dependencies
 RUN sudo apt-get update && sudo apt-get install -y jq rsync
