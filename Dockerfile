@@ -72,6 +72,7 @@ COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/PCG /home/ue4/UnrealEngin
 COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/OpenXR /home/ue4/UnrealEngine/Engine/Plugins/Runtime/OpenXR
 COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/OpenXRHandTracking /home/ue4/UnrealEngine/Engine/Plugins/Runtime/OpenXRHandTracking
 COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Runtime/RigVM /home/ue4/UnrealEngine/Engine/Plugins/Runtime/RigVM
+COPY --from=base /home/ue4/UnrealEngine/Engine/Plugins/Editor/ModelingToolsEditorMode /home/ue4/UnrealEngine/Engine/Plugins/Editor/ModelingToolsEditorMode
 
 # Install dependencies
 RUN sudo apt-get update && sudo apt-get install -y jq rsync
