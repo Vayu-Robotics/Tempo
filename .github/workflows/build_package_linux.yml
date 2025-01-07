@@ -66,16 +66,6 @@ jobs:
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
-    - name: Check Cached Build
-      run: |
-        du -sh TempoSample/* | sort -h
-        du -sh TempoSample/Intermediate/* | sort -h
-        ls -la --recursive TempoSample/Intermediate/
-    - name: Fix Permissions After Cache Restore
-      if: steps.build_cache.outputs.cache-hit == 'true'
-      run: |
-        sudo chown -R 1000:1000 TempoSample/
-        sudo chmod -R 755 TempoSample/
     - name: Cache Engine Mods
       id: cache-engine-mods
       uses: actions/cache@v4
@@ -101,10 +91,6 @@ jobs:
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/Runtime
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI
         docker rm temp_engine
-    - name: Debug Outside Container
-      run: |
-        ls -la TempoSample/Intermediate/
-        find TempoSample/Intermediate/ -type f | head -n 5
     - name: Docker Pull Unreal Image & Build
       run: |
         docker run --rm \
@@ -114,13 +100,9 @@ jobs:
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI/MassCrowd:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd \
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           ghcr.io/epicgames/unreal-engine:dev-slim-${{ env.UNREAL_VERSION }} \
-          bash -c 'echo "Before build:" && \
-                   find /home/ue4/TempoSample/Intermediate/ -name "*.o" -ls && \
-                   apt-get update && apt-get install -y jq rsync && \
+          bash -c 'apt-get update && apt-get install -y jq rsync && \
                    /home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh && \
-                   MSBUILDEMITSOLUTION=1 /home/ue4/TempoSample/Scripts/Build.sh 2>&1 | tee build.log && \
-                   echo "After build:" && \
-                   find /home/ue4/TempoSample/Intermediate/ -name "*.o" -ls'
+                   /home/ue4/TempoSample/Scripts/Build.sh'
     - name: Check Free Space After Build
       run: df -h /
     - name: Cache Build (only if main)
