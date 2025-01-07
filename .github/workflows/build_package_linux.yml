@@ -79,11 +79,6 @@ jobs:
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
-    - name: Fix Permissions After Cache Restore
-      if: steps.build_cache.outputs.cache-hit == 'true'
-      run: |
-        sudo chown -R 1000:1000 TempoSample/
-        sudo chmod -R 755 TempoSample/
     - name: Cache Engine Mods
       id: cache-engine-mods
       uses: actions/cache@v4
@@ -95,6 +90,12 @@ jobs:
           .engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool
           .engine-mods-cache/Engine/Binaries/DotNET/AutomationTool
         key: tempo-engine-mods-${{ env.UNREAL_VERSION }}-${{ hashFiles('TempoSample/Plugins/Tempo/EngineMods/**') }}
+    - name: Fix Permissions After Cache Restores
+      run: |
+        sudo chown -R 1000:1000 TempoSample/
+        sudo chmod -R 755 TempoSample/
+        sudo chown -R 1000:1000 .engine-mods-cache/
+        sudo chmod -R 755 .engine-mods-cache/
     - name: Check Free Space Before Docker Pull
       run: df -h /
     - name: Log in to Epic Container Registry
