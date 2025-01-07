@@ -130,9 +130,9 @@ jobs:
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           ghcr.io/epicgames/unreal-engine:dev-slim-${{ env.UNREAL_VERSION }} \
           bash -c 'apt-get update && apt-get install -y jq rsync && \
-                   /home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh && \
-                   /home/ue4/TempoSample/Scripts/Build.sh && \
-                   /home/ue4/TempoSample/Scripts/Package.sh'
+                   su ue4 -c "/home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh && \
+                              /home/ue4/TempoSample/Scripts/Build.sh && \
+                              /home/ue4/TempoSample/Scripts/Package.sh"'
     - name: Check Free Space After Build
       run: df -h /
     - name: Cache Build (only if main)
