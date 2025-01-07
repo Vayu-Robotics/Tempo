@@ -112,11 +112,13 @@ jobs:
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI/MassCrowd:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd \
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           ghcr.io/epicgames/unreal-engine:dev-slim-${{ env.UNREAL_VERSION }} \
-          bash -c 'ls -la /home/ue4/TempoSample/Intermediate/ && \
-                   find /home/ue4/TempoSample/Intermediate/ -type f | head -n 5 && \
+          bash -c 'echo "Before build:" && \
+                   find /home/ue4/TempoSample/Intermediate/ -name "*.o" -ls && \
                    apt-get update && apt-get install -y jq rsync && \
                    /home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh && \
-                   /home/ue4/TempoSample/Scripts/Build.sh'
+                   MSBUILDEMITSOLUTION=1 /home/ue4/TempoSample/Scripts/Build.sh 2>&1 | tee build.log && \
+                   echo "After build:" && \
+                   find /home/ue4/TempoSample/Intermediate/ -name "*.o" -ls'
     - name: Check Free Space After Build
       run: df -h /
     - name: Cache Build (only if main)
