@@ -68,6 +68,7 @@ jobs:
       run: |
         du -sh TempoSample/* | sort -h
         du -sh TempoSample/Intermediate/* | sort -h
+        ls -la --recursive TempoSample/Intermediate/
     - name: Fix Permissions After Cache Restore
       if: steps.build_cache.outputs.cache-hit == 'true'
       run: |
