@@ -40,6 +40,10 @@ jobs:
         path: TempoSample/Plugins/Tempo
         submodules: recursive
         fetch-depth: 0
+    - name: Check Modification Time of Source Files
+      run: |
+        find TempoSample -name "*.cpp" -printf "%p %TY-%Tm-%Td %TH:%TM:%TS %Tz\n"
+        find TempoSample -name "*.h" -printf "%p %TY-%Tm-%Td %TH:%TM:%TS %Tz\n"
     - name: Sync TempoThirdParty Dependencies
       run: |
         mkdir -p TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries
@@ -66,6 +70,11 @@ jobs:
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
+    - name: Fix Permissions After Cache Restore
+      if: steps.build_cache.outputs.cache-hit == 'true'
+      run: |
+        sudo chown -R 1000:1000 TempoSample/
+        sudo chmod -R 755 TempoSample/
     - name: Cache Engine Mods
       id: cache-engine-mods
       uses: actions/cache@v4
