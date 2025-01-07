@@ -34,6 +34,7 @@ jobs:
       with:
         repository: tempo-sim/TempoSample
         path: TempoSample
+        fetch-depth: 0
     - name: Checkout Tempo
       uses: actions/checkout@v4
       with:
@@ -43,12 +44,14 @@ jobs:
     - name: Overwrite Modification Timestamps of Source Files
       run: |
         cd TempoSample
-        git ls-tree -r --full-tree HEAD | while read -r mode type hash file; do
-          touch -d "$(git log -1 --format=%ai "$hash" --)" "$file"
+        git ls-files | while read file; do
+          timestamp=$(git log -1 --format=%cd --date=iso "$file")
+          touch -d "$timestamp" "$file"
         done
         cd Plugins/Tempo
-        git ls-tree -r --full-tree HEAD | while read -r mode type hash file; do
-          touch -d "$(git log -1 --format=%ai "$hash" --)" "$file"
+        git ls-files | while read file; do
+          timestamp=$(git log -1 --format=%cd --date=iso "$file")
+          touch -d "$timestamp" "$file"
         done
     - name: Sync TempoThirdParty Dependencies
       run: |
