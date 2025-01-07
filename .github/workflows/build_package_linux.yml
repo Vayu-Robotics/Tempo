@@ -131,11 +131,12 @@ jobs:
           ghcr.io/epicgames/unreal-engine:dev-slim-${{ env.UNREAL_VERSION }} \
           bash -c 'apt-get update && apt-get install -y jq rsync && \
                    /home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh && \
-                   /home/ue4/TempoSample/Scripts/Build.sh'
+                   /home/ue4/TempoSample/Scripts/Build.sh && \
+                   /home/ue4/TempoSample/Scripts/Package.sh'
     - name: Check Free Space After Build
       run: df -h /
     - name: Cache Build (only if main)
-      if: github.ref == 'refs/heads/main'
+      # if: github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: |
@@ -147,5 +148,5 @@ jobs:
           TempoSample/Saved/**
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
-        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
-        # key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
+        # key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
+        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
