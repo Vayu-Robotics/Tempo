@@ -41,7 +41,7 @@ jobs:
         path: TempoSample/Plugins/Tempo
         submodules: recursive
         fetch-depth: 0
-    - name: Overwrite Modification Timestamps of Source Files
+    - name: Overwrite Modification Timestamps of Source Files (so Build Cache is Valid)
       run: |
         cd TempoSample
         git ls-files | while read file; do
