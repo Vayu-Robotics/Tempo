@@ -40,10 +40,16 @@ jobs:
         path: TempoSample/Plugins/Tempo
         submodules: recursive
         fetch-depth: 0
-    - name: Check Modification Time of Source Files
+    - name: Overwrite Modification Timestamps of Source Files
       run: |
-        find TempoSample -name "*.cpp" -printf "%p %TY-%Tm-%Td %TH:%TM:%TS %Tz\n"
-        find TempoSample -name "*.h" -printf "%p %TY-%Tm-%Td %TH:%TM:%TS %Tz\n"
+        cd TempoSample
+        git ls-tree -r --full-tree HEAD | while read -r mode type hash file; do
+          touch -d "$(git log -1 --format=%ai "$hash" --)" "$file"
+        done
+        cd Plugins/Tempo
+        git ls-tree -r --full-tree HEAD | while read -r mode type hash file; do
+          touch -d "$(git log -1 --format=%ai "$hash" --)" "$file"
+        done
     - name: Sync TempoThirdParty Dependencies
       run: |
         mkdir -p TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries
@@ -115,7 +121,7 @@ jobs:
     - name: Check Free Space After Build
       run: df -h /
     - name: Cache Build (only if main)
-      if: github.ref == 'refs/heads/main'
+      # if: github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: |
@@ -127,5 +133,5 @@ jobs:
           TempoSample/Saved/**
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
-        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
-        # key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
+        # key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
+        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
