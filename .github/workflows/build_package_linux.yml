@@ -108,6 +108,9 @@ jobs:
       run: |
         mkdir -p .engine-mods-cache/Engine/Plugins/Runtime
         mkdir -p .engine-mods-cache/Engine/Plugins/AI
+        mkdir -p .engine-mods-cache/Engine/Source/Programs/UnrealBuildTool
+        mkdir -p .engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool
+        mkdir -p .engine-mods-cache/Engine/Binaries/DotNET/AutomationTool
         docker create --name temp_engine ghcr.io/epicgames/unreal-engine:dev-slim-${{ env.UNREAL_VERSION }}
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/Runtime
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI
