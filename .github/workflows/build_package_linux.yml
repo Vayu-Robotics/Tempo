@@ -84,7 +84,7 @@ jobs:
           TempoSample/Plugins/**/Binaries/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
     - name: Fix Build Cache Permissions After Restore
-      if: steps.build_cache.outputs.cache-hit != 'true'
+      if: steps.build_cache.outputs.cache-hit == true
       run: |
         sudo chown -R 1000:1000 TempoSample/
         sudo chmod -R 755 TempoSample/
@@ -100,7 +100,7 @@ jobs:
           .engine-mods-cache/Engine/Binaries/DotNET/AutomationTool
         key: tempo-engine-mods-${{ env.UNREAL_VERSION }}-${{ hashFiles('TempoSample/Plugins/Tempo/EngineMods/**') }}
     - name: Fix Engine Mods Cache Permissions After Restore
-      if: steps.cache-engine-mods.outputs.cache-hit != 'true'
+      if: steps.cache-engine-mods.outputs.cache-hit == true
       run: |
         sudo chown -R 1000:1000 .engine-mods-cache/
         sudo chmod -R 755 .engine-mods-cache/
@@ -124,7 +124,7 @@ jobs:
         sudo mv "/tmp/docker.json.tmp" "${DOCKER_DAEMON_JSON}"
         sudo systemctl restart docker
     - name: Initialize Engine Mods Cache
-      if: steps.cache-engine-mods.outputs.cache-hit != 'true'
+      if: steps.cache-engine-mods.outputs.cache-hit != true
       run: |
         mkdir -p .engine-mods-cache/Engine/Plugins/Runtime
         mkdir -p .engine-mods-cache/Engine/Plugins/AI
