@@ -63,20 +63,6 @@ jobs:
           TempoSample/Plugins/**/Binaries/**
           .engine-ddc-cache/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
-    - name: Debug Cook Timestamps
-      run: |
-        echo "Source files:"
-        find TempoSample/Source -type f -exec stat -c "%y %n" {} \;
-        echo "Content files:"
-        find TempoSample/Content -type f -exec stat -c "%y %n" {} \;
-        echo "DDC files:"
-        ls -la TempoSample/DerivedDataCache
-        find TempoSample/DerivedDataCache -type f -exec stat -c "%y %n" {} \;
-        echo "Saved:"
-        ls -la TempoSample/Saved
-        find TempoSample/Saved -type f -exec stat -c "%y %n" {} \;
-        echo "Intermediate:"
-        find TempoSample/Intermediate -type f -exec stat -c "%y %n" {} \;
     - name: Suppress Error in SyncDeps (TODO Fix this)
       run: |
         mkdir -p TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries
@@ -151,11 +137,13 @@ jobs:
         docker create --name temp_engine tempo_unreal_image
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/DerivedDataCache ${{ github.workspace }}/.engine-ddc-cache/Engine
         docker rm temp_engine
-    - name: Fix Engine Mods Permissions
+    - name: Fix Engine Mods and Engine DDC Permissions
       run: |
-        # Set the permissions of the engine mods files such that they can be accessed in the docker container.
+        # Set the permissions of the engine mods and engine DDC files such that they can be accessed in the docker container.
         sudo chown -R 1000:1000 .engine-mods-cache/
         sudo chmod -R 755 .engine-mods-cache/
+        sudo chown -R 1000:1000 .engine-ddc-cache/
+        sudo chmod -R 755 .engine-ddc-cache/
     - name: Sync Third Party Dependencies
       run: |
         docker run --rm \
