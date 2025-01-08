@@ -83,8 +83,7 @@ jobs:
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
-    - name: Fix Build Cache Permissions After Restore
-      if: steps.build_cache.outputs.cache-hit == true
+    - name: Fix Project Permissions
       run: |
         sudo chown -R 1000:1000 TempoSample/
         sudo chmod -R 755 TempoSample/
