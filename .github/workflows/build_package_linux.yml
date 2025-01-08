@@ -134,7 +134,6 @@ jobs:
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET
         docker rm temp_engine
     - name: Fix Engine Mods Cache Permissions After Restore
-      if: steps.cache-engine-mods.outputs.cache-hit == true
       run: |
         sudo chown -R 1000:1000 .engine-mods-cache/
         sudo chmod -R 755 .engine-mods-cache/
