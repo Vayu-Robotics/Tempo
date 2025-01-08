@@ -62,6 +62,10 @@ jobs:
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
+    - name: Suppress Error in SyncDeps (TODO Fix this)
+      run: |
+        mkdir -p TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries
+        touch TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries/dummy.txt
     - name: Fixup Source File Modification Timestamps and Permissions
       run: |
         # The modification timestamps are recreated on checkout. This overwrites them with their respective commit dates
@@ -125,14 +129,11 @@ jobs:
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET
         docker rm temp_engine
-    - name: Fix Engine Mods Cache Permissions After Restore
+    - name: Fix Engine Mods Permissions
       run: |
+        # Set the permissions of the engine mods files such that they can be accessed in the docker container.
         sudo chown -R 1000:1000 .engine-mods-cache/
         sudo chmod -R 755 .engine-mods-cache/
-    - name: Suppress Error in SyncDeps (TODO Fix this)
-      run: |
-        mkdir -p TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries
-        touch TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries/dummy.txt
     - name: Sync Third Party Dependencies
       run: |
         docker run --rm \
