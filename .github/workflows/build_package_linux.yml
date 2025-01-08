@@ -7,7 +7,7 @@ env:
 
 jobs:
   build:
-    name: Build
+    name: Build and Package Tempo Plugins
     runs-on: ubuntu-22.04
     concurrency:
       group: ${{ github.workflow }}-${{ github.ref }}
@@ -23,8 +23,8 @@ jobs:
         dotnet: true
         haskell: true
         large-packages: false
-        docker-images: true
-        swap-storage: true
+        docker-images: false
+        swap-storage: false
     - name: Check Free Space After Free
       run: df -h / && df -h /mnt
     - name: Install Dependencies
@@ -69,7 +69,7 @@ jobs:
       run: |
         cd TempoSample/Plugins/Tempo && echo "COMMON_ANCESTOR=$(git merge-base --fork-point origin/main)" >> $GITHUB_OUTPUT
     - name: Restore Build Cache from Main Common Ancestor
-      id: build_cache
+      if: github.ref != 'refs/heads/main'
       uses: actions/cache/restore@v4
       with:
         path: |
@@ -107,8 +107,11 @@ jobs:
         registry: ghcr.io
         username: ${{ secrets.EPIC_DOCKER_USERNAME }}
         password: ${{ secrets.EPIC_DOCKER_TOKEN }}
-    - name: Patch Docker Daemon data-root
+    - name: Patch Docker Daemon Data Root
       run: |
+        # Credit to https://github.com/orgs/community/discussions/26357
+        # The drive mounted at /mnt has a lot more free space than the main volume.
+        # Tell docker to store images there instead.
         DOCKER_DATA_ROOT='/mnt/var/lib/docker'
         DOCKER_DAEMON_JSON='/etc/docker/daemon.json'
         sudo mkdir -p "${DOCKER_DATA_ROOT}"
@@ -145,6 +148,17 @@ jobs:
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
           /home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh
+#    - name: Clean
+#      run: |
+#        docker run --rm \
+#          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/Runtime/ZoneGraph:/home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph \
+#          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI/MassCrowd:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd \
+#          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Source/Programs/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Source/Programs/UnrealBuildTool \
+#          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool \
+#          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
+#          -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
+#          tempo_unreal_image \
+#          /home/ue4/TempoSample/Scripts/Clean.sh
     - name: Build
       run: |
         docker run --rm \
@@ -166,6 +180,7 @@ jobs:
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
+          LD_LIBRARY_PATH="$UNREAL_ENGINE_PATH/Engine/Plugins/AI/MassAI/Binaries/Linux:$UNREAL_ENGINE_PATH/Engine/Plugins/Runtime/MassGameplay/Binaries/Linux:$UNREAL_ENGINE_PATH/Engine/Plugins/Runtime/ZoneGraph/Binaries/Linux:$UNREAL_ENGINE_PATH/Engine/Plugins/Runtime/ZoneGraphAnnotations/Binaries/Linux" && \
           /home/ue4/TempoSample/Scripts/Package.sh
     - name: Check Free Space After Build
       run: df -h /
