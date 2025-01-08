@@ -1,7 +1,14 @@
 name: Build and Package Tempo in TempoSample Project | Linux | UE5.4
 
-on: [push, pull_request, workflow_dispatch]
-
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      clean:
+        type: boolean
+        description: Build clean?
+        default: false
 env:
   UNREAL_VERSION: "5.4.4"
 
@@ -13,8 +20,6 @@ jobs:
       group: ${{ github.workflow }}-${{ github.ref }}
       cancel-in-progress: true
     steps:
-    - name: Check Free Space at Start
-      run: df -h / && df -h /mnt
     - name: Free Disk Space
       uses: jlumbroso/free-disk-space@main
       with:
@@ -25,12 +30,6 @@ jobs:
         large-packages: false
         docker-images: false
         swap-storage: false
-    - name: Check Free Space After Free
-      run: df -h / && df -h /mnt
-    - name: Install Dependencies
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y jq rsync
     - name: Checkout TempoSample
       uses: actions/checkout@v4
       with:
@@ -44,26 +43,6 @@ jobs:
         path: TempoSample/Plugins/Tempo
         submodules: recursive
         fetch-depth: 0
-    - name: Overwrite Modification Timestamps of Source Files (so Build Cache is Valid)
-      run: |
-        cd TempoSample
-        git ls-files | while read file; do
-          timestamp=$(git log -1 --format=%cd --date=iso "$file")
-          touch -d "$timestamp" "$file"
-        done
-        cd Plugins/Tempo
-        git ls-files | while read file; do
-          timestamp=$(git log -1 --format=%cd --date=iso "$file")
-          touch -d "$timestamp" "$file"
-        done
-    - name: Sync TempoThirdParty Dependencies
-      run: |
-        mkdir -p TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries
-        touch TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries/dummy.txt
-        mkdir -p TempoSample/Plugins/Tempo/TempoROS/Source/ThirdParty/rclcpp/Libraries
-        touch TempoSample/Plugins/Tempo/TempoROS/Source/ThirdParty/rclcpp/Libraries/dummy.txt
-        TempoSample/Plugins/Tempo/Scripts/SyncDeps.sh -force
-        TempoSample/Plugins/Tempo/TempoROS/Scripts/SyncDeps.sh -force
     - name: Find Common Ancestor with Main
       id: common_ancestor
       run: |
@@ -83,10 +62,24 @@ jobs:
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
-    - name: Fix Project Permissions
+    - name: Fixup Source File Modification Timestamps and Permissions
       run: |
-        sudo chown -R 1000:1000 TempoSample/
-        sudo chmod -R 755 TempoSample/
+        # The modification timestamps are recreated on checkout. This overwrites them with their respective commit dates
+        # so that the object files in the Intermediate folder will be considered valid during the build.
+        cd ${{ github.workspace }}/TempoSample
+        git ls-files | while read file; do
+          timestamp=$(git log -1 --format=%cd --date=iso "$file")
+          touch -d "$timestamp" "$file"
+        done
+        # Same for Tempo source files
+        cd ${{ github.workspace }}/TempoSample/Plugins/Tempo
+        git ls-files | while read file; do
+          timestamp=$(git log -1 --format=%cd --date=iso "$file")
+          touch -d "$timestamp" "$file"
+        done
+        # Set the permissions of the source files such that they can be accessed in the docker container.
+        sudo chown -R 1000:1000 ${{ github.workspace }}/TempoSample/
+        sudo chmod -R 755 ${{ github.workspace }}/TempoSample/
     - name: Cache Engine Mods
       id: cache-engine-mods
       uses: actions/cache@v4
@@ -118,8 +111,8 @@ jobs:
     - name: Build Tempo Unreal Docker Image
       run: |
         docker build --build-arg UNREAL_VERSION=${{ env.UNREAL_VERSION }} --tag 'tempo_unreal_image' -f ${{ github.workspace }}/TempoSample/Plugins/Tempo/Dockerfile .
-    - name: Initialize Engine Mods Cache
-      if: steps.cache-engine-mods.outputs.cache-hit != true
+    - name: Initialize Engine Mods Cache (if not restored)
+      if: steps.cache-engine-mods.outputs.cache-hit != 'true'
       run: |
         mkdir -p .engine-mods-cache/Engine/Plugins/Runtime
         mkdir -p .engine-mods-cache/Engine/Plugins/AI
@@ -136,6 +129,21 @@ jobs:
       run: |
         sudo chown -R 1000:1000 .engine-mods-cache/
         sudo chmod -R 755 .engine-mods-cache/
+    - name: Suppress Error in SyncDeps (TODO Fix this)
+      run: |
+        mkdir -p TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries
+        touch TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries/dummy.txt
+    - name: Sync Third Party Dependencies
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/Runtime/ZoneGraph:/home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI/MassCrowd:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Source/Programs/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Source/Programs/UnrealBuildTool \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
+          -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
+          tempo_unreal_image \
+          /home/ue4/TempoSample/Plugins/Tempo/Scripts/SyncDeps.sh -force
     - name: Install Engine Mods
       run: |
         docker run --rm \
@@ -147,17 +155,18 @@ jobs:
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
           /home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh
-#    - name: Clean
-#      run: |
-#        docker run --rm \
-#          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/Runtime/ZoneGraph:/home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph \
-#          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI/MassCrowd:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd \
-#          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Source/Programs/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Source/Programs/UnrealBuildTool \
-#          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool \
-#          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
-#          -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
-#          tempo_unreal_image \
-#          /home/ue4/TempoSample/Scripts/Clean.sh
+    - name: Clean (if requested)
+      if: ${{ github.event.inputs.clean }}
+      run: |
+        docker run --rm \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/Runtime/ZoneGraph:/home/ue4/UnrealEngine/Engine/Plugins/Runtime/ZoneGraph \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Plugins/AI/MassCrowd:/home/ue4/UnrealEngine/Engine/Plugins/AI/MassCrowd \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Source/Programs/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Source/Programs/UnrealBuildTool \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool \
+          -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
+          -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
+          tempo_unreal_image \
+          /home/ue4/TempoSample/Scripts/Clean.sh
     - name: Build
       run: |
         docker run --rm \
@@ -180,7 +189,7 @@ jobs:
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
           /home/ue4/TempoSample/Scripts/Package.sh
-    - name: Check Free Space at End
+    - name: Check Free Space
       run: df -h / && df -h /mnt
     - name: Cache Build (only if main)
       if: github.ref == 'refs/heads/main'
@@ -196,4 +205,3 @@ jobs:
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
-#        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
