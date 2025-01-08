@@ -70,6 +70,7 @@ jobs:
         cd TempoSample/Plugins/Tempo && echo "COMMON_ANCESTOR=$(git merge-base --fork-point origin/main)" >> $GITHUB_OUTPUT
     - name: Restore Build Cache from Main Common Ancestor
       if: github.ref != 'refs/heads/main'
+      id: build_cache
       uses: actions/cache/restore@v4
       with:
         path: |
@@ -82,6 +83,11 @@ jobs:
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
+    - name: Fix Build Cache Permissions After Restore
+      if: steps.build_cache.outputs.cache-hit != 'true'
+      run: |
+        sudo chown -R 1000:1000 TempoSample/
+        sudo chmod -R 755 TempoSample/
     - name: Cache Engine Mods
       id: cache-engine-mods
       uses: actions/cache@v4
@@ -93,10 +99,9 @@ jobs:
           .engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool
           .engine-mods-cache/Engine/Binaries/DotNET/AutomationTool
         key: tempo-engine-mods-${{ env.UNREAL_VERSION }}-${{ hashFiles('TempoSample/Plugins/Tempo/EngineMods/**') }}
-    - name: Fix Permissions After Cache Restores
+    - name: Fix Engine Mods Cache Permissions After Restore
+      if: steps.cache-engine-mods.outputs.cache-hit != 'true'
       run: |
-        sudo chown -R 1000:1000 TempoSample/
-        sudo chmod -R 755 TempoSample/
         sudo chown -R 1000:1000 .engine-mods-cache/
         sudo chmod -R 755 .engine-mods-cache/
     - name: Check Free Space Before Docker Pull
