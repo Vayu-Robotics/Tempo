@@ -61,6 +61,7 @@ jobs:
           TempoSample/Saved/**
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
+          .engine-ddc-cache/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
     - name: Debug Cook Timestamps
       run: |
@@ -143,6 +144,13 @@ jobs:
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET
         docker cp temp_engine:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET
         docker rm temp_engine
+    - name: Initialize Engine DDC Cache (if not restored)
+      if: steps.build_cache.outputs.cache-hit != 'true'
+      run: |
+        mkdir -p .engine-ddc-cache/Engine
+        docker create --name temp_engine tempo_unreal_image
+        docker cp temp_engine:/home/ue4/UnrealEngine/Engine/DerivedDataCache ${{ github.workspace }}/.engine-ddc-cache/Engine
+        docker rm temp_engine
     - name: Fix Engine Mods Permissions
       run: |
         # Set the permissions of the engine mods files such that they can be accessed in the docker container.
@@ -156,6 +164,7 @@ jobs:
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Source/Programs/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Source/Programs/UnrealBuildTool \
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool \
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
+          -v ${{ github.workspace }}/.engine-ddc-cache/Engine/DerivedDataCache:/home/ue4/UnrealEngine/Engine/DerivedDataCache \
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
           /home/ue4/TempoSample/Plugins/Tempo/Scripts/SyncDeps.sh -force
@@ -167,6 +176,7 @@ jobs:
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Source/Programs/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Source/Programs/UnrealBuildTool \
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool \
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
+          -v ${{ github.workspace }}/.engine-ddc-cache/Engine/DerivedDataCache:/home/ue4/UnrealEngine/Engine/DerivedDataCache \
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
           /home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh
@@ -179,6 +189,7 @@ jobs:
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Source/Programs/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Source/Programs/UnrealBuildTool \
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool \
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
+          -v ${{ github.workspace }}/.engine-ddc-cache/Engine/DerivedDataCache:/home/ue4/UnrealEngine/Engine/DerivedDataCache \
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
           /home/ue4/TempoSample/Scripts/Clean.sh
@@ -190,6 +201,7 @@ jobs:
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Source/Programs/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Source/Programs/UnrealBuildTool \
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool \
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
+          -v ${{ github.workspace }}/.engine-ddc-cache/Engine/DerivedDataCache:/home/ue4/UnrealEngine/Engine/DerivedDataCache \
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
           /home/ue4/TempoSample/Scripts/Build.sh
@@ -201,13 +213,14 @@ jobs:
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Source/Programs/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Source/Programs/UnrealBuildTool \
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/UnrealBuildTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/UnrealBuildTool \
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
+          -v ${{ github.workspace }}/.engine-ddc-cache/Engine/DerivedDataCache:/home/ue4/UnrealEngine/Engine/DerivedDataCache \
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
           /home/ue4/TempoSample/Scripts/Package.sh
     - name: Check Free Space
       run: df -h / && df -h /mnt
     - name: Cache Build (if main)
-      if: github.ref == 'refs/heads/main'
+#      if: github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: |
@@ -219,4 +232,6 @@ jobs:
           TempoSample/Saved/**
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
-        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
+          .engine-ddc-cache/**
+#        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
+        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
