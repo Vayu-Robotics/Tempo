@@ -183,7 +183,7 @@ jobs:
     - name: Check Free Space at End
       run: df -h / && df -h /mnt
     - name: Cache Build (only if main)
-      # if: github.ref == 'refs/heads/main'
+      if: github.ref == 'refs/heads/main'
       uses: actions/cache/save@v4
       with:
         path: |
@@ -195,5 +195,5 @@ jobs:
           TempoSample/Saved/**
           TempoSample/Plugins/**/Intermediate/**
           TempoSample/Plugins/**/Binaries/**
-        # key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
-        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
+        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
+#        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
