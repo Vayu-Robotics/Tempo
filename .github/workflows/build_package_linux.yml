@@ -69,9 +69,11 @@ jobs:
         echo "Content files:"
         find TempoSample/Content -type f -exec stat -c "%y %n" {} \;
         echo "DDC files:"
+        ls -la TempoSample/DerivedDataCache
         find TempoSample/DerivedDataCache -type f -exec stat -c "%y %n" {} \;
-        echo "Shader cache:"
-        find TempoSample/Saved/ShaderCaches -type f -exec stat -c "%y %n" {} \;
+        echo "Saved:"
+        ls -la TempoSample/Saved
+        find TempoSample/Saved -type f -exec stat -c "%y %n" {} \;
         echo "Intermediate:"
         find TempoSample/Intermediate -type f -exec stat -c "%y %n" {} \;
     - name: Suppress Error in SyncDeps (TODO Fix this)
