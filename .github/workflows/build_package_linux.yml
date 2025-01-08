@@ -180,7 +180,6 @@ jobs:
           -v ${{ github.workspace }}/.engine-mods-cache/Engine/Binaries/DotNET/AutomationTool:/home/ue4/UnrealEngine/Engine/Binaries/DotNET/AutomationTool \
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
-          LD_LIBRARY_PATH="$UNREAL_ENGINE_PATH/Engine/Plugins/AI/MassAI/Binaries/Linux:$UNREAL_ENGINE_PATH/Engine/Plugins/Runtime/MassGameplay/Binaries/Linux:$UNREAL_ENGINE_PATH/Engine/Plugins/Runtime/ZoneGraph/Binaries/Linux:$UNREAL_ENGINE_PATH/Engine/Plugins/Runtime/ZoneGraphAnnotations/Binaries/Linux" && \
           /home/ue4/TempoSample/Scripts/Package.sh
     - name: Check Free Space After Build
       run: df -h /
