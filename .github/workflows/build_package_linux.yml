@@ -223,7 +223,7 @@ jobs:
           -v ${{ github.workspace }}/.engine-ddc-cache/Engine/DerivedDataCache:/home/ue4/UnrealEngine/Engine/DerivedDataCache \
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
-          /home/ue4/TempoSample/Scripts/Package.sh
+          /home/ue4/TempoSample/Scripts/Package.sh -ddc=NoZenLocalFallback
     - name: Check Free Space
       run: df -h / && df -h /mnt
     - name: Cache Build (if main)
