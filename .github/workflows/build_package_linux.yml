@@ -1,3 +1,26 @@
+# ======
+# Tempo Build and Package Workflow
+# This workflow builds and packages the Tempo plugins within the TempoSample project on a standard GitHub-hosted runner.
+# It relies on the Epic-distributed Unreal images (github.com/orgs/EpicGames/packages/container/package/unreal-engine)
+# Unreal is a large (>40gb) dependency and packaging is resource-intensive. To deal with these constraints the workflow
+# uses a few non-standard techniques:
+# - We free space on the runner's main filesystem before starting by removing unnecessary packages. This gives us space
+#   to build and package the project. However this is still not enough space to store Unreal, so the Unreal docker
+#   container is stored on the /mnt filesystem, which has considerably more free space.
+# - We cache two types of artifacts to speed up builds:
+#   - The Tempo Unreal "Engine Mods", which are parts of the engine Tempo modifies in-place. Since the engine lives in
+#     the Docker container, but we want to cache our modifications to it, we "initialize" the .engine-mods-cache
+#     directory, which we will cache, with the vanilla engine before attempting to modify it.
+#   - The results of the nearest Tempo build on the main branch, including the Engine's DerivedDataCache folder, where
+#     some cooked artifacts are stored and which is "initialized" in the same way as the engine mods cache above (except
+#     in the .engine-ddc-cache directory). This cache speeds up the build and package steps substantially.
+# - Since the TempoSample and Tempo source files, and any restored cached files, will be mounted in the docker container
+#   in order to build the project there, we change their permissions to the match those of the user in the container.
+# - Git does not store file timestamps, so the modification timestamps of the source files will be the time they were
+#   checked out (during a run of this workflow). This will invalidate the build cache. So we overwrite the modification
+#   timestamps with the time the files were committed.
+# ======
+
 name: Build and Package Tempo in TempoSample Project | Linux | UE5.4
 
 on:
@@ -7,7 +30,7 @@ on:
     inputs:
       clean:
         type: boolean
-        description: Build clean?
+        description: Clean before Build
         default: false
 env:
   UNREAL_VERSION: "5.4.4"
@@ -46,7 +69,7 @@ jobs:
     - name: Find Common Ancestor with Main
       id: common_ancestor
       run: |
-        cd TempoSample/Plugins/Tempo && echo "COMMON_ANCESTOR=$(git merge-base --fork-point origin/main)" >> $GITHUB_OUTPUT
+        cd TempoSample/Plugins/Tempo && echo "COMMON_ANCESTOR=$(git merge-base HEAD origin/main)" >> $GITHUB_OUTPUT
     - name: Restore Build Cache from Main Common Ancestor
       if: github.ref != 'refs/heads/main'
       id: build_cache
@@ -63,10 +86,6 @@ jobs:
           TempoSample/Plugins/**/Binaries/**
           .engine-ddc-cache/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
-    - name: Suppress Error in SyncDeps (TODO Fix this)
-      run: |
-        mkdir -p TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries
-        touch TempoSample/Plugins/Tempo/TempoCore/Source/ThirdParty/gRPC/Libraries/dummy.txt
     - name: Fixup Source File Modification Timestamps and Permissions
       run: |
         # The modification timestamps are recreated on checkout. This overwrites them with their respective commit dates
@@ -85,7 +104,7 @@ jobs:
         # Set the permissions of the source files such that they can be accessed in the docker container.
         sudo chown -R 1000:1000 ${{ github.workspace }}/TempoSample/
         sudo chmod -R 755 ${{ github.workspace }}/TempoSample/
-    - name: Cache Engine Mods
+    - name: Restore Cached Engine Mods
       id: cache-engine-mods
       uses: actions/cache@v4
       with:
@@ -168,7 +187,7 @@ jobs:
           -v ${{ github.workspace }}/TempoSample:/home/ue4/TempoSample \
           tempo_unreal_image \
           /home/ue4/TempoSample/Plugins/Tempo/Scripts/InstallEngineMods.sh
-    - name: Clean
+    - name: Clean (if requested)
       if: ${{ github.event.inputs.clean }}
       run: |
         docker run --rm \
@@ -222,4 +241,3 @@ jobs:
           TempoSample/Plugins/**/Binaries/**
           .engine-ddc-cache/**
         key: tempo-build-${{ env.UNREAL_VERSION }}-${{ github.sha }}
-#        key: tempo-build-${{ env.UNREAL_VERSION }}-${{ steps.common_ancestor.outputs.COMMON_ANCESTOR }}
