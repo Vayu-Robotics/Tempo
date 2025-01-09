@@ -1,0 +1,31 @@
+# ======
+# Build and Package Workflow for the Tempo plugins.
+# This workflow uses the generic Build and Package workflow in the same directory to builds and packages
+# the Tempo plugins within the TempoSample host project.
+# ======
+
+name: Build and Package the Tempo Plugins Using the TempoSample Project | Linux | UE5.4
+
+on:
+  push:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build_and_package:
+    permissions:
+      contents: read
+      pull-requests: write
+    uses: ./.github/workflows/build_package_linux.yml
+    with:
+      clean: false
+      project_root: TempoSample
+      tempo_root: TempoSample/Plugins/Tempo
+      host_project: tempo-sim/TempoSample
+      checkout_path: TempoSample/Plugins/Tempo
+      build_cache_root: TempoSample/Plugins/Tempo
+      base_branch: main
+    secrets:
+      epic_docker_username: ${{ secrets.EPIC_DOCKER_USERNAME }}
+      epic_docker_token: ${{ secrets.EPIC_DOCKER_TOKEN }}
