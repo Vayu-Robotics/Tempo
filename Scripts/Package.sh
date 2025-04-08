@@ -7,6 +7,17 @@ PROJECT_ROOT=$("$SCRIPT_DIR"/FindProjectRoot.sh)
 cd "$PROJECT_ROOT"
 PROJECT_NAME=$(find . -maxdepth 1 -name "*.uproject" -exec basename {} .uproject \;)
 
+# Parse additional map directories from arguments
+ADDITIONAL_MAP_DIRS=()
+OTHER_ARGS=()
+for arg in "$@"; do
+    if [[ $arg == --map-dir=* ]]; then
+        ADDITIONAL_MAP_DIRS+=("${arg#--map-dir=}")
+    else
+        OTHER_ARGS+=("$arg")
+    fi
+done
+
 # Check for UNREAL_ENGINE_PATH
 if [ -z ${UNREAL_ENGINE_PATH+x} ]; then
   echo "Please set UNREAL_ENGINE_PATH environment variable and re-run";
@@ -152,5 +163,5 @@ fi
 
 # Rename pak chunks by the levels they contain (unless told not to or there are no chunks)
 if [[ $* != *skippakchunkrename* && -d "$PROJECT_ROOT/Packaged/Metadata/ChunkManifest" ]]; then
-  eval "$SCRIPT_DIR"/RenamePakChunks.sh "$PROJECT_ROOT/Packaged" "$PROJECT_ROOT/Packaged/Metadata"
+  eval "$SCRIPT_DIR"/RenamePakChunks.sh "$PROJECT_ROOT/Packaged" "$PROJECT_ROOT/Packaged/Metadata" "${ADDITIONAL_MAP_DIRS[@]}"
 fi
