@@ -8,6 +8,7 @@
 #include "TempoCoreUtils.h"
 #include "TempoWorldUtils.h"
 
+#include "Components/SplineComponent.h"
 #include "EngineUtils.h"
 #if WITH_EDITOR
 #include "LevelEditor.h"
@@ -25,6 +26,7 @@ using AddComponentResponse = TempoWorld::AddComponentResponse;
 using DestroyComponentRequest = TempoWorld::DestroyComponentRequest;
 using SetActorTransformRequest = TempoWorld::SetActorTransformRequest;
 using SetComponentTransformRequest = TempoWorld::SetComponentTransformRequest;
+using SetSplinePointsRequest = TempoWorld::SetSplinePointsRequest;
 using ActivateComponentRequest = TempoWorld::ActivateComponentRequest;
 using DeactivateComponentRequest = TempoWorld::DeactivateComponentRequest;
 using GetAllActorsResponse = TempoWorld::GetAllActorsResponse;
@@ -117,6 +119,7 @@ void UTempoWorldControlServiceSubsystem::RegisterServices(FTempoServer& Server)
 		SimpleRequestHandler(&WorldControlAsyncService::RequestDestroyComponent, &UTempoWorldControlServiceSubsystem::DestroyComponent),
 		SimpleRequestHandler(&WorldControlAsyncService::RequestSetActorTransform, &UTempoWorldControlServiceSubsystem::SetActorTransform),
 		SimpleRequestHandler(&WorldControlAsyncService::RequestSetComponentTransform, &UTempoWorldControlServiceSubsystem::SetComponentTransform),
+		SimpleRequestHandler(&WorldControlAsyncService::RequestSetSplinePoints, &UTempoWorldControlServiceSubsystem::SetSplinePoints),
 		SimpleRequestHandler(&WorldControlAsyncService::RequestGetAllActors, &UTempoWorldControlServiceSubsystem::GetAllActors),
 		SimpleRequestHandler(&WorldControlAsyncService::RequestGetAllComponents, &UTempoWorldControlServiceSubsystem::GetAllComponents),
 		SimpleRequestHandler(&WorldControlAsyncService::RequestGetActorProperties, &UTempoWorldControlServiceSubsystem::GetActorProperties),
@@ -576,6 +579,60 @@ void UTempoWorldControlServiceSubsystem::SetComponentTransform(const TempoWorld:
 	{
 		Component->SetRelativeTransform(Transform);
 	}
+
+	ResponseContinuation.ExecuteIfBound(TempoCore::Empty(), grpc::Status_OK);
+}
+
+void UTempoWorldControlServiceSubsystem::SetSplinePoints(const TempoWorld::SetSplinePointsRequest& Request, const TResponseDelegate<TempoCore::Empty>& ResponseContinuation) const
+{
+	if (Request.actor().empty())
+	{
+		ResponseContinuation.ExecuteIfBound(TempoCore::Empty(), grpc::Status(grpc::FAILED_PRECONDITION, "actor must be specified in SetSplinePoints request"));
+		return;
+	}
+
+	if (Request.component().empty())
+	{
+		ResponseContinuation.ExecuteIfBound(TempoCore::Empty(), grpc::Status(grpc::FAILED_PRECONDITION, "component must be specified in SetSplinePoints request"));
+		return;
+	}
+
+	if (Request.points_size() < 2)
+	{
+		ResponseContinuation.ExecuteIfBound(TempoCore::Empty(), grpc::Status(grpc::FAILED_PRECONDITION, "SetSplinePoints requires at least 2 points"));
+		return;
+	}
+
+	const FString ActorName(UTF8_TO_TCHAR(Request.actor().c_str()));
+	AActor* Actor = GetActorWithName(GetWorld(), ActorName);
+	if (!Actor)
+	{
+		const FString ErrorMsg = FString::Printf(TEXT("Failed to find actor '%s' for SetSplinePoints request"), *ActorName);
+		ResponseContinuation.ExecuteIfBound(TempoCore::Empty(), grpc::Status(grpc::NOT_FOUND, std::string(TCHAR_TO_UTF8(*ErrorMsg))));
+		return;
+	}
+
+	const FString ComponentName(UTF8_TO_TCHAR(Request.component().c_str()));
+	USplineComponent* Spline = GetComponentWithName<USplineComponent>(Actor, ComponentName);
+	if (!Spline)
+	{
+		const FString ErrorMsg = FString::Printf(TEXT("Failed to find spline component '%s' on actor '%s' for SetSplinePoints request"), *ComponentName, *ActorName);
+		ResponseContinuation.ExecuteIfBound(TempoCore::Empty(), grpc::Status(grpc::NOT_FOUND, std::string(TCHAR_TO_UTF8(*ErrorMsg))));
+		return;
+	}
+
+	// Matches SetComponentTransformRequest's own relative_to_world field and default (relative to
+	// the component's parent unless explicitly set to world space).
+	const ESplineCoordinateSpace::Type Space = Request.relative_to_world() ? ESplineCoordinateSpace::World : ESplineCoordinateSpace::Local;
+
+	Spline->ClearSplinePoints(false);
+	for (const TempoCore::Vector& Point : Request.points())
+	{
+		const FVector Location = QuantityConverter<M2CM,R2L>::Convert(FVector(Point.x(), Point.y(), Point.z()));
+		Spline->AddSplinePoint(Location, Space, false);
+	}
+	Spline->SetClosedLoop(Request.closed_loop(), false);
+	Spline->UpdateSpline();
 
 	ResponseContinuation.ExecuteIfBound(TempoCore::Empty(), grpc::Status_OK);
 }

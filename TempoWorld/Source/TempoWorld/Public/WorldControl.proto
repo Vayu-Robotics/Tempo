@@ -87,6 +87,22 @@ message SetComponentTransformRequest {
   bool relative_to_world = 4;
 }
 
+message SetSplinePointsRequest {
+  // Name of the owning actor.
+  string actor = 1;
+  // Name of the USplineComponent to rebuild.
+  string component = 2;
+  // Ordered points to rebuild the spline component's curve from -- replaces all existing points.
+  // Must have at least 2. Meters / right-handed, in world space or relative to the component's
+  // parent depending on `relative_to_world`.
+  repeated TempoCore.Vector points = 3;
+  // If true, `points` are in world space; otherwise relative to the component's parent. Matches
+  // SetComponentTransformRequest's own field of the same name and default.
+  bool relative_to_world = 4;
+  // If true, the spline forms a closed loop (SplineComponent::SetClosedLoop).
+  bool closed_loop = 5;
+}
+
 message ActivateComponentRequest {
   // Name of the owning actor.
   string actor = 1;
@@ -540,6 +556,8 @@ service WorldControlService {
   rpc SetActorTransform(SetActorTransformRequest) returns (TempoCore.Empty);
 
   rpc SetComponentTransform(SetComponentTransformRequest) returns (TempoCore.Empty);
+
+  rpc SetSplinePoints(SetSplinePointsRequest) returns (TempoCore.Empty);
 
   rpc ActivateComponent(ActivateComponentRequest) returns (TempoCore.Empty);
 
