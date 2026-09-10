@@ -15,6 +15,20 @@
 #include "EngineUtils.h"
 #include "Components/InstancedStaticMeshComponent.h"
 
+#include "CoreGlobals.h"   // GFrameCounter - TEMP [NaniteCP]
+
+// TEMP [NaniteCP] instrumentation. Custom-depth toggles here are the only thing in this project that
+// puts Custom Pass references on Nanite raster bins, and a bin whose primitive refcount drops to
+// zero while those refs are still held is the assert at NaniteShading.cpp:2200. Counting the toggles
+// and stamping the frame lets a crash log answer the one open question: was a toggle in flight in
+// the same frame window as the sky-light capture that forced the scene update?
+// Toggles inside a bulk pass are logged as a summary; the spawn-driven ones (few, and the suspected
+// racers with the periodic capture) are logged individually.
+// Strip with Docs/Unreal56/Bugs/nanite_custompass_skylight_capture.md
+static int32 GNaniteCPOn   = 0;
+static int32 GNaniteCPOff  = 0;
+static bool  GNaniteCPBulk = false;
+
 FInstanceIdAllocator::FInstanceIdAllocator(int32 MinIdIn, int32 MaxIdIn)
 	: MinId(MinIdIn), MaxId(MaxIdIn)
 {
@@ -553,10 +567,17 @@ void UTempoActorLabeler::BuildLabelMaps()
 
 void UTempoActorLabeler::LabelAllActors()
 {
+	const int32 OnBefore = GNaniteCPOn;   // TEMP [NaniteCP]
+	GNaniteCPBulk = true;
+
 	for (TActorIterator<AActor> ActorItr(GetWorld()); ActorItr; ++ActorItr)
 	{
 		LabelActor(*ActorItr);
 	}
+
+	GNaniteCPBulk = false;   // TEMP [NaniteCP]
+	UE_LOG(LogTempoSensors, Warning, TEXT("[NaniteCP] LabelAllActors toggled %d component(s) ON frame=%llu world=%s"),
+		GNaniteCPOn - OnBefore, (uint64)GFrameCounter, *GetWorld()->GetName());
 }
 
 void UTempoActorLabeler::LabelActor(AActor* Actor)
@@ -732,10 +753,17 @@ void UTempoActorLabeler::LabelComponent(UPrimitiveComponent* Component, FInstanc
 
 void UTempoActorLabeler::UnLabelAllActors()
 {
+	const int32 OffBefore = GNaniteCPOff;   // TEMP [NaniteCP]
+	GNaniteCPBulk = true;
+
 	for (TActorIterator<AActor> ActorItr(GetWorld()); ActorItr; ++ActorItr)
 	{
 		UnLabelActor(*ActorItr);
 	}
+
+	GNaniteCPBulk = false;   // TEMP [NaniteCP]
+	UE_LOG(LogTempoSensors, Warning, TEXT("[NaniteCP] UnLabelAllActors toggled %d component(s) OFF frame=%llu world=%s"),
+		GNaniteCPOff - OffBefore, (uint64)GFrameCounter, *GetWorld()->GetName());
 
 	// Clear the set of labeled actor class names
 	LabeledActorClassNames.Empty();
@@ -789,6 +817,13 @@ void UTempoActorLabeler::UnLabelComponent(UPrimitiveComponent* Component)
 	Component->SetRenderCustomDepth(false);
 	Component->SetCustomDepthStencilValue(0);
 
+	++GNaniteCPOff;   // TEMP [NaniteCP]
+	if (!GNaniteCPBulk)
+	{
+		UE_LOG(LogTempoSensors, Warning, TEXT("[NaniteCP] custom-depth OFF frame=%llu on=%d off=%d %s"),
+			(uint64)GFrameCounter, GNaniteCPOn, GNaniteCPOff, *Component->GetPathName());
+	}
+
 	if (GetDefault<UTempoSensorsSettings>()->GetLabelType() == ELabelType::Instance)
 	{
 		if (const FInstanceSemanticIdPair* ComponentIdPair = LabeledObjects.Find(Component))
@@ -815,6 +850,12 @@ void UTempoActorLabeler::AssignId(UPrimitiveComponent* Component, FInstanceSeman
 	if (!Component->bRenderCustomDepth)
 	{
 		Component->SetRenderCustomDepth(true);
+		++GNaniteCPOn;   // TEMP [NaniteCP]
+		if (!GNaniteCPBulk)
+		{
+			UE_LOG(LogTempoSensors, Warning, TEXT("[NaniteCP] custom-depth ON frame=%llu on=%d off=%d %s"),
+				(uint64)GFrameCounter, GNaniteCPOn, GNaniteCPOff, *Component->GetPathName());
+		}
 	}
 	const int32 StencilValue = GetDefault<UTempoSensorsSettings>()->GetLabelType() == ELabelType::Instance ? IdPair.InstanceId : IdPair.SemanticId;
 	if (Component->CustomDepthStencilValue != StencilValue)

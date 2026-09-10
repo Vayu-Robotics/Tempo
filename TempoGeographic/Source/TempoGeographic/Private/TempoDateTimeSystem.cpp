@@ -7,6 +7,7 @@
 #include "Components/SkyLightComponent.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "CoreGlobals.h"   // GFrameCounter - TEMP [NaniteCP]
 
 ATempoDateTimeSystem* ATempoDateTimeSystem::GetTempoDateTimeSystem(UObject* WorldContextObject)
 {
@@ -112,6 +113,15 @@ void ATempoDateTimeSystem::RecaptureStaticSkyLights()
 
 	if (NumDirtied > 0)
 	{
+		// TEMP [NaniteCP] instrumentation. This pump queues a cubemap capture whose render-thread
+		// scene update has asserted one frame later (NaniteShading.cpp:2200, dangling Custom Pass refs
+		// on a Nanite raster bin). Log the frame BEFORE the pump: the existing Display line below only
+		// prints if the pump returned, so "enter without pumped" localises the fault inside the pump,
+		// and the frame number cross-references TempoActorLabeler's [NaniteCP] custom-depth toggles.
+		// Strip with Docs/Unreal56/Bugs/nanite_custompass_skylight_capture.md
+		UE_LOG(LogTempoGeographic, Warning, TEXT("[NaniteCP] sky pump enter frame=%llu world=%s dirtied=%d begunplay=%d"),
+			(uint64)GFrameCounter, *World->GetName(), NumDirtied, World->HasBegunPlay() ? 1 : 0);
+
 		// Pump the static capture queue now. In a normal client this is driven from UGameEngine::Tick,
 		// but that pump is skipped under -RenderOffscreen; calling it here makes it run headless.
 		USkyLightComponent::UpdateSkyCaptureContents(World);
