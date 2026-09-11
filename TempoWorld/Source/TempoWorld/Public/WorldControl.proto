@@ -474,6 +474,14 @@ message CallFunctionRequest {
   string component = 2;
   // Name of the UFUNCTION to invoke.
   string function = 3;
+  // String-encoded arguments, one per non-return, non-out parameter, in the
+  // function's declared parameter order. Each is parsed according to that
+  // parameter's actual property type (bool/int/int64/float/double/string/name/enum
+  // -- the same primitive set the Set*Property RPCs support). Leave empty for a
+  // parameterless function. A function with a return value, an out/reference
+  // parameter, or a parameter of any other type (struct, array, object, ...) is
+  // rejected.
+  repeated string args = 4;
 }
 
 // One operation in a SetProperties batch. The oneof selects which set-property
