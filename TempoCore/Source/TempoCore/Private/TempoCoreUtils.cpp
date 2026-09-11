@@ -45,6 +45,26 @@ namespace
 		TEXT("Used for any Actor that doesn't implement that interface.")
 		);
 
+	float GDefaultSplineMeshBoundsTargetCuboidsPerMeter = 0.5f;
+	FAutoConsoleVariableRef CVarDefaultSplineMeshBoundsTargetCuboidsPerMeter(
+		TEXT("Tempo.SplineMeshBounds.TargetCuboidsPerMeter"),
+		GDefaultSplineMeshBoundsTargetCuboidsPerMeter,
+		TEXT("Default minimum sub-segment density (cuboids/meter) for segmented spline-mesh bounds --\n")
+		TEXT("on by default (0.5); 0 disables it. See\n")
+		TEXT("ITempoSegmentedSplineMeshBoundsInterface::GetSegmentedSplineMeshBoundsTargetCuboidsPerMeter.\n")
+		TEXT("Used for any Actor that doesn't implement that interface.")
+		);
+
+	float GDefaultSplineMeshBoundsMaxCuboidLengthCm = 2000.0f;
+	FAutoConsoleVariableRef CVarDefaultSplineMeshBoundsMaxCuboidLengthCm(
+		TEXT("Tempo.SplineMeshBounds.MaxCuboidLengthCm"),
+		GDefaultSplineMeshBoundsMaxCuboidLengthCm,
+		TEXT("Default hard cap (cm) on any single reported sub-segment's length for segmented\n")
+		TEXT("spline-mesh bounds -- on by default (2000cm / 20m); <= 0 disables it. See\n")
+		TEXT("ITempoSegmentedSplineMeshBoundsInterface::GetSegmentedSplineMeshBoundsMaxCuboidLengthCm.\n")
+		TEXT("Used for any Actor that doesn't implement that interface.")
+		);
+
 	// Every implementer of TInterface on Actor: the Actor itself, if its class implements the
 	// interface, plus every component that does. The Actor-level case matters for Actors that generate
 	// their own sub-geometry (e.g. ASplinePropLine) and would rather expose a setting next to the
@@ -114,6 +134,8 @@ namespace
 	{
 		bool bSegmented = true;
 		float ChordToleranceCm = 5.0f;
+		float TargetCuboidsPerMeter = 0.5f;
+		float MaxCuboidLengthCm = 2000.0f;
 	};
 
 	FSplineMeshBoundsSettings ResolveSplineMeshBoundsSettings(const AActor* Actor)
@@ -122,18 +144,39 @@ namespace
 			FindBoundsInterfaceImplementers<UTempoSegmentedSplineMeshBoundsInterface, ITempoSegmentedSplineMeshBoundsInterface>(Actor);
 		if (Implementers.IsEmpty())
 		{
-			return { GDefaultSegmentSplineMeshBounds != 0, FMath::Max(GDefaultSplineMeshBoundsChordToleranceCm, 0.1f) };
+			return {
+				GDefaultSegmentSplineMeshBounds != 0,
+				FMath::Max(GDefaultSplineMeshBoundsChordToleranceCm, 0.1f),
+				FMath::Max(GDefaultSplineMeshBoundsTargetCuboidsPerMeter, 0.0f),
+				GDefaultSplineMeshBoundsMaxCuboidLengthCm
+			};
 		}
 
 		FSplineMeshBoundsSettings Settings;
 		Settings.bSegmented = true;
 		Settings.ChordToleranceCm = TNumericLimits<float>::Max();
+		Settings.TargetCuboidsPerMeter = 0.0f;
+		Settings.MaxCuboidLengthCm = TNumericLimits<float>::Max();
 		for (const ITempoSegmentedSplineMeshBoundsInterface* Implementer : Implementers)
 		{
 			Settings.bSegmented = Settings.bSegmented && Implementer->ShouldReportSegmentedSplineMeshBounds();
 			Settings.ChordToleranceCm = FMath::Min(Settings.ChordToleranceCm, Implementer->GetSegmentedSplineMeshBoundsChordToleranceCm());
+			// Opposite of ChordToleranceCm's min-wins rule -- a bigger target here means MORE
+			// subdivision demanded, so the most demanding (largest) implementer wins.
+			Settings.TargetCuboidsPerMeter = FMath::Max(Settings.TargetCuboidsPerMeter, Implementer->GetSegmentedSplineMeshBoundsTargetCuboidsPerMeter());
+			// Min-wins, like ChordToleranceCm: a SMALLER cap here is more restrictive/demanding.
+			const float ImplementerMaxLength = Implementer->GetSegmentedSplineMeshBoundsMaxCuboidLengthCm();
+			if (ImplementerMaxLength > 0.0f)
+			{
+				Settings.MaxCuboidLengthCm = FMath::Min(Settings.MaxCuboidLengthCm, ImplementerMaxLength);
+			}
 		}
 		Settings.ChordToleranceCm = FMath::Max(Settings.ChordToleranceCm, 0.1f);
+		Settings.TargetCuboidsPerMeter = FMath::Max(Settings.TargetCuboidsPerMeter, 0.0f);
+		if (Settings.MaxCuboidLengthCm == TNumericLimits<float>::Max())
+		{
+			Settings.MaxCuboidLengthCm = 0.0f; // every implementer disabled it (<= 0)
+		}
 		return Settings;
 	}
 
@@ -377,7 +420,8 @@ FBox UTempoCoreUtils::GetActorLocalBounds(const AActor* Actor, bool bIncludeHidd
 }
 
 void UTempoCoreUtils::AppendSplineMeshSegmentBounds(const USplineMeshComponent* SplineMeshComponent, const AActor* Actor,
-	float ChordToleranceCm, const TOptional<float>& MaxRelevantHeight, TArray<FTempoInstanceBounds>& OutInstanceBounds)
+	float ChordToleranceCm, float TargetCuboidsPerMeter, float MaxCuboidLengthCm,
+	const TOptional<float>& MaxRelevantHeight, TArray<FTempoInstanceBounds>& OutInstanceBounds)
 {
 	const UStaticMesh* Mesh = SplineMeshComponent->GetStaticMesh();
 	if (!Mesh)
@@ -443,8 +487,13 @@ void UTempoCoreUtils::AppendSplineMeshSegmentBounds(const USplineMeshComponent* 
 	// over-subdividing a short component into slivers.
 	constexpr int32 MinSubSegmentsForStraightRuns = 4;
 	constexpr float MinSubSegmentLengthCm = 1.0f;
+	// Shared cap for BOTH the bend-dependent bisection below and the TargetCuboidsPerMeter top-up
+	// after it -- GetActorLocalInstanceBounds runs per world-state query and a fence line can hold
+	// hundreds of SplineMeshComponents, so an unbounded subdivision here would be a real cost.
+	constexpr int32 MaxSubSegments = 32;
 	TArray<float> Boundaries;
-	if (IsEffectivelyStraight(SplineMeshComponent, DomainMin, DomainMax))
+	const bool bIsStraightRun = IsEffectivelyStraight(SplineMeshComponent, DomainMin, DomainMax);
+	if (bIsStraightRun)
 	{
 		const float StraightSubSegmentLength = (DomainMax - DomainMin) / MinSubSegmentsForStraightRuns;
 		if (StraightSubSegmentLength >= MinSubSegmentLengthCm)
@@ -493,9 +542,7 @@ void UTempoCoreUtils::AppendSplineMeshSegmentBounds(const USplineMeshComponent* 
 		};
 
 		// Iterative bisection over a work list (not naive recursion) so MaxSubSegments is an exact,
-		// enforceable cap -- GetActorLocalInstanceBounds runs per world-state query and a fence line can
-		// hold hundreds of SplineMeshComponents, so an unbounded subdivision here would be a real cost.
-		constexpr int32 MaxSubSegments = 32;
+		// enforceable cap.
 		const float MinSubSegmentLength = FMath::Max(1.0f, (DomainMax - DomainMin) / MaxSubSegments);
 
 		Boundaries = { DomainMin, DomainMax };
@@ -515,6 +562,94 @@ void UTempoCoreUtils::AppendSplineMeshSegmentBounds(const USplineMeshComponent* 
 			Queue.Add({ Mid, D1 });
 		}
 		Boundaries.Sort();
+	}
+
+	if (TargetCuboidsPerMeter > 0.0f)
+	{
+		// Drives the bend-dependent result (whatever it produced above) toward TargetSegmentCount from
+		// EITHER direction -- see
+		// ITempoSegmentedSplineMeshBoundsInterface::GetSegmentedSplineMeshBoundsTargetCuboidsPerMeter.
+		// Domain length is in cm (this function's own working unit throughout); convert to meters here.
+		const float DomainLengthMeters = (DomainMax - DomainMin) / 100.0f;
+		int32 TargetSegmentCount = FMath::Clamp(FMath::RoundToInt(DomainLengthMeters * TargetCuboidsPerMeter), 1, MaxSubSegments);
+		if (bIsStraightRun)
+		{
+			// The straight-run failure-isolation floor above (MinSubSegmentsForStraightRuns) exists for
+			// reliability, not chord accuracy -- a density target is never allowed to coarsen a straight
+			// run below it, only to ask for MORE than it.
+			TargetSegmentCount = FMath::Max(TargetSegmentCount, FMath::Min(MinSubSegmentsForStraightRuns, MaxSubSegments));
+		}
+
+		// UNDER target: split the CURRENTLY largest sub-segment, repeatedly, same as before -- spreads
+		// new splits evenly rather than piling them into whichever segment happened to come first.
+		while (Boundaries.Num() - 1 < TargetSegmentCount && Boundaries.Num() < MaxSubSegments + 1)
+		{
+			int32 LargestIndex = 0;
+			float LargestLength = 0.0f;
+			for (int32 i = 0; i + 1 < Boundaries.Num(); ++i)
+			{
+				const float Length = Boundaries[i + 1] - Boundaries[i];
+				if (Length > LargestLength)
+				{
+					LargestLength = Length;
+					LargestIndex = i;
+				}
+			}
+			if (LargestLength <= 2.0f * MinSubSegmentLengthCm)
+			{
+				break; // every sub-segment is already at the floor length; stop rather than sliver them
+			}
+			const float Mid = 0.5f * (Boundaries[LargestIndex] + Boundaries[LargestIndex + 1]);
+			Boundaries.Insert(Mid, LargestIndex + 1);
+		}
+
+		// OVER target: COARSEN by repeatedly merging whichever adjacent pair of sub-segments would
+		// produce the SMALLEST combined length -- i.e. undo the least-impactful split first, which in
+		// practice removes the finest, most-marginal bend-driven subdivisions before ever touching the
+		// coarser splits that capture the run's actual bends. Boundaries always has >= 2 entries
+		// (DomainMin, DomainMax), so this never merges away the whole component.
+		while (Boundaries.Num() - 1 > TargetSegmentCount && Boundaries.Num() > 2)
+		{
+			int32 SmallestPairIndex = 0;
+			float SmallestMergedLength = TNumericLimits<float>::Max();
+			for (int32 i = 0; i + 2 < Boundaries.Num(); ++i)
+			{
+				const float MergedLength = Boundaries[i + 2] - Boundaries[i];
+				if (MergedLength < SmallestMergedLength)
+				{
+					SmallestMergedLength = MergedLength;
+					SmallestPairIndex = i;
+				}
+			}
+			Boundaries.RemoveAt(SmallestPairIndex + 1);
+		}
+	}
+
+	if (MaxCuboidLengthCm > 0.0f)
+	{
+		// Independent hard cap, enforced AFTER the density target above (which may have just coarsened
+		// the result) -- purely additive: always splits the currently-largest sub-segment until every
+		// one is at or under MaxCuboidLengthCm, or MaxSubSegments/the floor length is reached.
+		while (Boundaries.Num() < MaxSubSegments + 1)
+		{
+			int32 LargestIndex = 0;
+			float LargestLength = 0.0f;
+			for (int32 i = 0; i + 1 < Boundaries.Num(); ++i)
+			{
+				const float Length = Boundaries[i + 1] - Boundaries[i];
+				if (Length > LargestLength)
+				{
+					LargestLength = Length;
+					LargestIndex = i;
+				}
+			}
+			if (LargestLength <= MaxCuboidLengthCm || LargestLength <= 2.0f * MinSubSegmentLengthCm)
+			{
+				break;
+			}
+			const float Mid = 0.5f * (Boundaries[LargestIndex] + Boundaries[LargestIndex + 1]);
+			Boundaries.Insert(Mid, LargestIndex + 1);
+		}
 	}
 
 	const FTransform ComponentToActor = SplineMeshComponent->GetComponentTransform().GetRelativeTransform(Actor->GetTransform());
@@ -698,7 +833,8 @@ TArray<FTempoInstanceBounds> UTempoCoreUtils::GetActorLocalInstanceBounds(const 
 			{
 				const int32 CountBefore = InstanceBounds.Num();
 				UTempoCoreUtils::AppendSplineMeshSegmentBounds(SplineMeshComponent, Actor,
-					BoundsSettings.ChordToleranceCm, MaxRelevantHeight, InstanceBounds);
+					BoundsSettings.ChordToleranceCm, BoundsSettings.TargetCuboidsPerMeter, BoundsSettings.MaxCuboidLengthCm,
+					MaxRelevantHeight, InstanceBounds);
 				if (InstanceBounds.Num() > CountBefore)
 				{
 					continue;
